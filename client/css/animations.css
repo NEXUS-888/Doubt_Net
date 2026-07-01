@@ -1,0 +1,227 @@
+/* ============================================================
+   animations.css — Premium Motion System & Transitions
+   ============================================================ */
+
+/* ---------- Screen Transition (Glow & Scale-Up) ---------- */
+@keyframes screen-in {
+  from {
+    opacity: 0;
+    transform: scale(0.97) translateY(8px);
+    filter: blur(4px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+    filter: blur(0);
+  }
+}
+
+/* ---------- Premium Glass Card Entrance ---------- */
+@keyframes card-in {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ---------- Smooth Toast System ---------- */
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.95);
+    filter: blur(2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+}
+
+@keyframes toast-out {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.95);
+    filter: blur(1px);
+  }
+}
+
+.toast {
+  animation: toast-in 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+.toast.leaving {
+  animation: toast-out 0.25s ease-in both;
+}
+
+/* ---------- Pulse Ring (Status Indicators) ---------- */
+@keyframes pulse-ring {
+  0% {
+    box-shadow: 0 0 0 0 rgba(124, 58, 237, 0.4);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(124, 58, 237, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(124, 58, 237, 0);
+  }
+}
+
+/* ---------- Smooth Fade & Slide In (For List Items) ---------- */
+@keyframes item-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.moderation-item, .approved-item, .my-doubt-card, .leaderboard-row, .cluster-card {
+  animation: item-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* ---------- Rarity & Points Score Pop ---------- */
+@keyframes points-pop {
+  0%   { transform: scale(1); }
+  50%  { transform: scale(1.25); filter: drop-shadow(0 0 8px var(--dn-emerald)); }
+  100% { transform: scale(1); }
+}
+
+/* ---------- Leaderboard Reveal (Staggered-like) ---------- */
+@keyframes leaderboard-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(15px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ---------- Countdown Pulse Alert ---------- */
+@keyframes countdown-pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.05);
+    opacity: 0.85;
+    color: var(--error-red);
+    text-shadow: 0 0 8px rgba(239, 68, 68, 0.4);
+  }
+}
+
+.countdown-timer.urgent {
+  animation: countdown-pulse 1s ease-in-out infinite;
+}
+
+/* ---------- Glow Border Pulse (Focus State) ---------- */
+@keyframes glow-border {
+  0%, 100% {
+    border-color: var(--dn-violet);
+    box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.15), 0 0 10px rgba(124, 58, 237, 0.1);
+  }
+  50% {
+    border-color: var(--dn-pink);
+    box-shadow: 0 0 0 3px rgba(236, 72, 153, 0.25), 0 0 20px rgba(236, 72, 153, 0.3);
+  }
+}
+
+.field input:focus, .field textarea:focus {
+  animation: glow-border 2.5s ease-in-out infinite;
+}
+
+/* ---------- Interactive Error Shake ---------- */
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-6px); }
+  40%, 80% { transform: translateX(6px); }
+}
+
+.shake {
+  animation: shake 0.4s ease-in-out;
+}
+
+/* ---------- Hover Lift & Glow Interactions ---------- */
+.btn-primary, .btn-ghost, .tab, .teacher-tab, .urgency-option {
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(124, 58, 237, 0.3);
+}
+
+.btn-ghost:hover {
+  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.tab:hover, .teacher-tab:hover {
+  color: var(--text-primary);
+}
+
+.my-doubt-card, .moderation-item, .approved-item, .cluster-card {
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.my-doubt-card:hover, .moderation-item:hover, .approved-item:hover, .cluster-card:hover {
+  transform: translateY(-2px) scale(1.005);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+/* ---------- Confetti Cascade ---------- */
+@keyframes confetti-fall {
+  0% {
+    transform: translateY(-10px) rotate(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(100vh) rotate(720deg);
+    opacity: 0;
+  }
+}
+
+/* ---------- Premium Logo Animations ---------- */
+@keyframes track-in {
+  0% {
+    letter-spacing: -0.1em;
+    filter: blur(8px);
+    opacity: 0;
+  }
+  100% {
+    letter-spacing: 0.18em;
+    filter: blur(0);
+    opacity: 1;
+  }
+}
+
+@keyframes shimmer-sweep {
+  0% {
+    background-position: -200% center;
+  }
+  100% {
+    background-position: 200% center;
+  }
+}
+
+@keyframes neon-glow {
+  0%, 100% {
+    box-shadow: 0 0 4px var(--dn-violet), 0 0 10px rgba(167, 139, 250, 0.6);
+  }
+  50% {
+    box-shadow: 0 0 8px var(--dn-pink), 0 0 20px rgba(236, 72, 153, 0.6);
+  }
+}

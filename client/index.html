@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DoubtNet — Anonymous Doubt Resolution</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="css/theme.css">
+<link rel="stylesheet" href="css/animations.css">
+</head>
+<body>
+
+<div class="bg-grid" aria-hidden="true"></div>
+<div class="bg-glow" aria-hidden="true"></div>
+
+<!-- ============ AUTH SCREEN ============ -->
+<main id="auth-screen" class="screen">
+  <div class="auth-card" id="auth-card">
+    <div class="brand">
+      <span class="brand-dot" id="brand-dot"></span>
+      <h1>DOUBTNET</h1>
+    </div>
+    <p class="brand-sub">Anonymous doubt resolution — submit questions without fear.</p>
+
+    <div class="tab-row" role="tablist">
+      <button class="tab active" id="tab-login" role="tab" aria-selected="true">Log in</button>
+      <button class="tab" id="tab-register" role="tab" aria-selected="false">Register</button>
+    </div>
+    <div class="tab-row role-row" role="tablist" id="role-row">
+      <button class="tab active" id="role-student" role="tab" data-role="student">Student</button>
+      <button class="tab" id="role-teacher" role="tab" data-role="teacher">Teacher</button>
+    </div>
+
+    <form id="auth-form" autocomplete="off">
+      <label class="field">
+        <span>Username</span>
+        <input type="text" id="username-input" name="username" maxlength="20" required autocomplete="off">
+      </label>
+      <label class="field">
+        <span>Password</span>
+        <input type="password" id="password-input" name="password" maxlength="64" required autocomplete="off">
+      </label>
+      <label class="field hidden" id="room-code-field">
+        <span>Room Code</span>
+        <input type="text" id="room-code-input" placeholder="e.g. PHYS-3847" autocomplete="off">
+      </label>
+      <label class="field hidden" id="room-name-field">
+        <span>Room Name</span>
+        <input type="text" id="room-name-input" placeholder="e.g. Physics Class" autocomplete="off">
+      </label>
+
+      <div id="auth-error" class="auth-error" role="alert" aria-live="polite"></div>
+
+      <button type="submit" id="auth-submit" class="btn-primary">
+        <span id="auth-submit-label">Connect</span>
+      </button>
+    </form>
+
+    <div class="server-config">
+      <label>
+        <span>Server</span>
+        <input type="text" id="server-url-input" value="ws://10.136.99.209:8765" autocomplete="off">
+      </label>
+    </div>
+  </div>
+</main>
+
+<!-- ============ NEEDS ROOM SCREEN ============ -->
+<main id="needs-room-screen" class="screen hidden">
+  <div class="auth-card" id="needs-room-card">
+    <div class="brand">
+      <span class="brand-dot"></span>
+      <h1>DOUBTNET</h1>
+    </div>
+    <p class="brand-sub">Setup your class room to continue.</p>
+
+    <div id="teacher-setup-area" class="hidden">
+      <form id="create-room-form" autocomplete="off">
+        <label class="field">
+          <span>Room Name</span>
+          <input type="text" id="create-room-name-input" placeholder="e.g. Science Room" required autocomplete="off">
+        </label>
+        <button type="submit" class="btn-primary">Create Room</button>
+      </form>
+    </div>
+
+    <div id="student-setup-area" class="hidden">
+      <form id="join-room-form" autocomplete="off">
+        <label class="field">
+          <span>Room Code</span>
+          <input type="text" id="join-room-code-input" placeholder="e.g. PHYS-3847" required autocomplete="off">
+        </label>
+        <button type="submit" class="btn-primary">Join Room</button>
+      </form>
+    </div>
+
+    <div id="needs-room-error" class="auth-error" role="alert" aria-live="polite"></div>
+  </div>
+</main>
+
+<!-- ============ STUDENT DASHBOARD ============ -->
+<main id="student-screen" class="screen hidden">
+  <header class="dash-header">
+    <div class="dash-header-left">
+      <span class="brand-dot"></span>
+      <h1>DOUBTNET</h1>
+      <span id="student-room-display" class="room-badge"></span>
+    </div>
+    <div class="dash-header-center">
+      <span class="phase-badge" id="student-phase-badge">Waiting</span>
+      <span class="countdown-timer" id="student-countdown"></span>
+    </div>
+    <div class="dash-header-right">
+      <span class="points-badge" id="student-points-badge">0 pts</span>
+      <span class="me-label" id="student-me-label"></span>
+      <button class="btn-ghost" id="student-logout-btn">Disconnect</button>
+    </div>
+  </header>
+
+  <div class="pinned-doubt-banner hidden" id="student-pinned-banner">
+    <span class="pinned-badge">📌 CURRENTLY EXPLAINING</span>
+    <span class="pinned-text" id="student-pinned-text"></span>
+  </div>
+
+  <div class="dash-body">
+    <!-- Left: Submission panel -->
+    <section class="submission-panel" id="submission-panel">
+      <h2 class="panel-title">Submit a Doubt</h2>
+      <div class="phase-status-card" id="phase-status-card">
+        <div class="phase-icon" id="phase-icon">&#9203;</div>
+        <div class="phase-text" id="phase-text">Waiting for class...</div>
+      </div>
+
+      <div class="doubt-form-area" id="doubt-form-area">
+        <div class="doubt-input-wrap">
+          <textarea id="doubt-input" class="doubt-input" placeholder="What's your doubt? Be specific..." maxlength="500" rows="4"></textarea>
+          <span class="char-counter" id="char-counter">0/500</span>
+          <span class="autosave-indicator" id="autosave-indicator"></span>
+        </div>
+
+        <div class="urgency-row">
+          <label class="urgency-option active" data-urgency="clarification">
+            <input type="radio" name="urgency" value="clarification" checked hidden>
+            <span class="urgency-dot"></span>
+            <span>Quick clarification</span>
+          </label>
+          <label class="urgency-option" data-urgency="blocking">
+            <input type="radio" name="urgency" value="blocking" hidden>
+            <span class="urgency-dot urgency-dot-high"></span>
+            <span>Blocking — I'm lost</span>
+          </label>
+        </div>
+
+        <button id="submit-doubt-btn" class="btn-primary" disabled>Submit Doubt</button>
+        <span class="anon-counter" id="anon-counter">0 doubts submitted</span>
+      </div>
+    </section>
+
+    <!-- Right: My doubts -->
+    <section class="my-doubts-panel" id="my-doubts-panel">
+      <h2 class="panel-title">My Doubts This Week</h2>
+      <div class="my-doubts-list" id="my-doubts-list">
+        <p class="empty-state">No doubts submitted yet.</p>
+      </div>
+    </section>
+  </div>
+
+  <!-- Leaderboard preview -->
+  <div class="leaderboard-preview hidden" id="leaderboard-preview">
+    <h2>Leaderboard</h2>
+    <div id="student-leaderboard-body"></div>
+  </div>
+</main>
+
+<!-- ============ TEACHER DASHBOARD ============ -->
+<main id="teacher-screen" class="screen hidden">
+  <header class="dash-header">
+    <div class="dash-header-left">
+      <span class="brand-dot"></span>
+      <h1>DOUBTNET</h1>
+      <span class="teacher-badge">Teacher</span>
+      <span id="teacher-room-display" class="room-badge"></span>
+    </div>
+    <div class="dash-header-right">
+      <span class="me-label" id="teacher-me-label"></span>
+      <button class="btn-ghost" id="teacher-logout-btn">Disconnect</button>
+    </div>
+  </header>
+
+  <div class="pinned-doubt-banner hidden" id="teacher-pinned-banner">
+    <span class="pinned-badge">📌 CURRENTLY EXPLAINING</span>
+    <span class="pinned-text" id="teacher-pinned-text"></span>
+    <button class="btn-unpin" id="teacher-unpin-btn">Unpin</button>
+  </div>
+
+  <div class="teacher-tabs" id="teacher-tabs">
+    <button class="teacher-tab active" data-tab="schedule">Schedule</button>
+    <button class="teacher-tab" data-tab="live">Live Doubts</button>
+    <button class="teacher-tab" data-tab="clusters">Clusters</button>
+    <button class="teacher-tab" data-tab="resolution">Resolution</button>
+    <button class="teacher-tab" data-tab="leaderboard">Leaderboard</button>
+  </div>
+
+  <!-- Schedule Panel -->
+  <div class="teacher-panel active" id="panel-schedule">
+    <h2>Schedule Configuration</h2>
+    <div class="schedule-form">
+      <label class="field"><span>Week Start (YYYY-MM-DD)</span><input type="text" id="sched-week-start" placeholder="2026-06-30"></label>
+      <label class="field"><span>Subject</span><input type="text" id="sched-subject" placeholder="Physics"></label>
+      <div id="schedule-days"></div>
+      <button id="save-schedule-btn" class="btn-primary" style="margin-top:12px">Save Schedule</button>
+      <button id="demo-mode-btn" class="btn-ghost" style="margin-top:8px">Toggle Demo Mode</button>
+      <button id="allow-all-doubts-btn" class="btn-ghost" style="margin-top:8px; border-color:var(--dn-amber); color:var(--dn-amber)">Allow All Doubts: OFF</button>
+      <button id="export-report-btn" class="btn-primary" style="margin-top:16px; background:linear-gradient(135deg, var(--dn-emerald) 0%, rgba(16, 185, 129, 0.8) 100%); color:#fff; font-weight:700;">Export Session Report (PDF)</button>
+    </div>
+  </div>
+
+  <!-- Live Doubts Panel -->
+  <div class="teacher-panel" id="panel-live">
+    <h2>Flagged for Review</h2>
+    <div id="moderation-list" style="margin-bottom: 24px;"><p class="empty-state">No flagged doubts.</p></div>
+
+    <h2>Approved Doubts Feed</h2>
+    <div id="live-approved-list"><p class="empty-state">No approved doubts yet.</p></div>
+  </div>
+
+  <!-- Clusters Panel -->
+  <div class="teacher-panel" id="panel-clusters">
+    <h2>Cluster Review</h2>
+    <div class="cluster-actions">
+      <button id="auto-cluster-btn" class="btn-primary">Auto-Cluster</button>
+      <button id="undo-cluster-btn" class="btn-ghost">Undo</button>
+      <button id="finalize-clusters-btn" class="btn-primary" style="background:var(--success-green);color:#06181d">Finalize Clusters</button>
+    </div>
+    <div id="cluster-list"><p class="empty-state">No clusters yet. Run auto-cluster after approving doubts.</p></div>
+  </div>
+
+  <!-- Resolution Panel -->
+  <div class="teacher-panel" id="panel-resolution">
+    <h2>Day 5 Resolution Queue</h2>
+    <div id="resolution-list"><p class="empty-state">Waiting for resolution day or cluster finalization.</p></div>
+  </div>
+
+  <!-- Leaderboard Panel -->
+  <div class="teacher-panel" id="panel-leaderboard">
+    <h2>Leaderboard</h2>
+    <button id="refresh-leaderboard-btn" class="btn-ghost">Refresh</button>
+    <button id="reveal-leaderboard-btn" class="btn-primary" style="margin-left:8px">Reveal to Class</button>
+    <div id="teacher-leaderboard-body"></div>
+  </div>
+</main>
+
+<!-- ============ LEADERBOARD REVEAL ============ -->
+<main id="leaderboard-screen" class="screen hidden">
+  <div class="lb-reveal">
+    <h1 class="lb-title">Leaderboard</h1>
+    <div class="podium" id="podium"></div>
+    <div class="lb-list" id="lb-full-list"></div>
+    <canvas id="confetti-canvas" class="confetti-canvas"></canvas>
+  </div>
+</main>
+
+<div id="toast-container" class="toast-container" aria-live="polite"></div>
+
+<button class="theme-btn" title="Switch theme">Dark</button>
+
+<script src="js/api.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/theme.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/student.js"></script>
+<script src="js/teacher.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
