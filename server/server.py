@@ -10,13 +10,14 @@ import threading
 import http.server
 import functools
 import os
+import sys
 
 from connection_manager import ConnectionManager
 from chat_server import handle_connection
 import schedule as sched
 import protocol
 
-HOST = "0.0.0.0"
+HOST = sys.argv[1] if len(sys.argv) > 1 else "0.0.0.0"
 PORT = 8765
 HTTP_PORT = 8080
 
@@ -38,13 +39,13 @@ async def state_broadcaster(manager: ConnectionManager):
             print(f"[!] State broadcast error: {e}")
 
 
-def start_http_server():
+def start_http_server(bind_ip):
     """Serve the client directory over HTTP for easy access."""
     client_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "client")
     client_dir = os.path.normpath(client_dir)
     handler = functools.partial(http.server.SimpleHTTPRequestHandler, directory=client_dir)
-    httpd = http.server.HTTPServer(("0.0.0.0", HTTP_PORT), handler)
-    print(f"[+] HTTP server serving client at http://10.136.99.209:{HTTP_PORT}")
+    httpd = http.server.HTTPServer((bind_ip, HTTP_PORT), handler)
+    print(f"[+] HTTP server serving client at http://{bind_ip if bind_ip != '0.0.0.0' else '10.136.99.209'}:{HTTP_PORT}")
     httpd.serve_forever()
 
 
@@ -54,7 +55,7 @@ async def main():
     async def handler(websocket):
         await handle_connection(websocket, manager)
 
-    print(f"[+] DoubtNet server starting on ws://10.136.99.209:{PORT}")
+    print(f"[+] DoubtNet server starting on ws://{HOST if HOST != '0.0.0.0' else '10.136.99.209'}:{PORT}")
     print(f"[*] State broadcasts every {STATE_BROADCAST_INTERVAL}s")
 
     asyncio.create_task(state_broadcaster(manager))
@@ -66,7 +67,7 @@ async def main():
 
 if __name__ == "__main__":
     # Start HTTP static file server in background thread
-    http_thread = threading.Thread(target=start_http_server, daemon=True)
+    http_thread = threading.Thread(target=start_http_server, args=(HOST,), daemon=True)
     http_thread.start()
 
     asyncio.run(main())
