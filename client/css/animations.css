@@ -28,6 +28,20 @@
   }
 }
 
+/* ---------- Notepad Page Swing Open (Top Hinge) ---------- */
+@keyframes notepad-open {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -50%) rotateX(-95deg);
+    filter: blur(2px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) rotateX(0deg);
+    filter: blur(0);
+  }
+}
+
 /* ---------- Smooth Toast System ---------- */
 @keyframes toast-in {
   from {

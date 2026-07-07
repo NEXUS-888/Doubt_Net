@@ -1,7 +1,8 @@
 /**
  * auth.js
  * -------
- * Login/register screen logic with role-aware and room-aware routing.
+ * Login/register screen logic with role-aware routing.
+ * After login/register, server sends rooms_list -> app.js renders picker.
  */
 
 const Auth = (() => {
@@ -19,30 +20,54 @@ const Auth = (() => {
   const usernameInput = document.getElementById('username-input');
   const passwordInput = document.getElementById('password-input');
   
-  const roomCodeField = document.getElementById('room-code-field');
-  const roomCodeInput = document.getElementById('room-code-input');
-  const roomNameField = document.getElementById('room-name-field');
-  const roomNameInput = document.getElementById('room-name-input');
-  
   const authError = document.getElementById('auth-error');
   const submitLabel = document.getElementById('auth-submit-label');
   const serverUrlInput = document.getElementById('server-url-input');
   const brandDot = document.getElementById('brand-dot');
 
-  // Needs Room Screen Elements
-  const needsRoomScreen = document.getElementById('needs-room-screen');
-  const teacherSetup = document.getElementById('teacher-setup-area');
-  const studentSetup = document.getElementById('student-setup-area');
-  const createRoomForm = document.getElementById('create-room-form');
-  const joinRoomForm = document.getElementById('join-room-form');
-  const needsRoomError = document.getElementById('needs-room-error');
-
   function init() {
+    if (serverUrlInput) {
+      const ip = window.SERVER_IP || '10.136.99.209';
+      const wsProtocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+      serverUrlInput.value = `${wsProtocol}://${ip}:8765`;
+    }
     bindEvents();
-    UI.showScreen('auth-screen');
+    UI.showScreen('landing-screen');
   }
 
   function bindEvents() {
+    // Landing screen handlers
+    const aboutBtn = document.getElementById('landing-about-btn');
+    if (aboutBtn) {
+      aboutBtn.addEventListener('click', () => {
+        UI.toast('DoubtNet is a real-time anonymous doubt resolution board.', 'info', 4000);
+      });
+    }
+
+    const loginBtn = document.getElementById('landing-login-btn');
+    if (loginBtn) {
+      loginBtn.addEventListener('click', () => {
+        setMode(false);
+        UI.showScreen('auth-screen');
+      });
+    }
+
+    const signupBtn = document.getElementById('landing-signup-btn');
+    if (signupBtn) {
+      signupBtn.addEventListener('click', () => {
+        setMode(true);
+        UI.showScreen('auth-screen');
+      });
+    }
+
+    const startBtn = document.getElementById('landing-start-btn');
+    if (startBtn) {
+      startBtn.addEventListener('click', () => {
+        setMode(false);
+        UI.showScreen('auth-screen');
+      });
+    }
+
     tabLogin.addEventListener('click', () => setMode(false));
     tabRegister.addEventListener('click', () => setMode(true));
 
@@ -53,16 +78,6 @@ const Auth = (() => {
       e.preventDefault();
       handleSubmit();
     });
-
-    createRoomForm.addEventListener('submit', (e) => {
-      e.preventDefault();
-      handleCreateRoom();
-    });
-
-    joinRoomForm.addEventListener('submit', (e) => {
-      e.preventDefault();
-      handleJoinRoom();
-    });
   }
 
   function setMode(register) {
@@ -72,13 +87,6 @@ const Auth = (() => {
     roleRow.classList.toggle('hidden', !register);
     submitLabel.textContent = register ? 'Create Account' : 'Connect';
     authError.textContent = '';
-    
-    if (!register) {
-      roomCodeField.classList.add('hidden');
-      roomNameField.classList.add('hidden');
-    } else {
-      setRole(currentRole);
-    }
   }
 
   function setRole(role) {
@@ -86,41 +94,47 @@ const Auth = (() => {
     roleStudent.classList.toggle('active', role === 'student');
     roleTeacher.classList.toggle('active', role === 'teacher');
     authError.textContent = '';
-    
-    if (isRegister) {
-      roomCodeField.classList.toggle('hidden', role !== 'student');
-      roomNameField.classList.toggle('hidden', role !== 'teacher');
-    } else {
-      roomCodeField.classList.add('hidden');
-      roomNameField.classList.add('hidden');
-    }
   }
 
   function handleSubmit() {
     const username = usernameInput.value.trim();
     const password = passwordInput.value;
     const serverUrl = serverUrlInput.value.trim();
-    const roomCode = roomCodeInput.value.trim();
-    const roomName = roomNameInput.value.trim();
 
     if (!username || !password) {
       authError.textContent = 'Fill in all fields.';
       return;
     }
 
+    const usernameRegex = /^[a-zA-Z0-9_\-]+$/;
+    if (username.length < 3 || username.length > 20) {
+      authError.textContent = 'Username must be 3-20 characters.';
+      UI.shake('auth-card');
+      return;
+    }
+    if (!usernameRegex.test(username)) {
+      authError.textContent = 'Username can only contain letters, numbers, _ and -.';
+      UI.shake('auth-card');
+      return;
+    }
+
+    if (password.length < 6) {
+      authError.textContent = 'Password must be at least 6 characters.';
+      UI.shake('auth-card');
+      return;
+    }
     if (isRegister) {
-      if (currentRole === 'student' && !roomCode) {
-        authError.textContent = 'Room Code is required.';
-        return;
-      }
-      if (currentRole === 'teacher' && !roomName) {
-        authError.textContent = 'Room Name is required.';
+      const hasLetter = /[a-zA-Z]/.test(password);
+      const hasNumber = /[0-9]/.test(password);
+      if (!hasLetter || !hasNumber) {
+        authError.textContent = 'Password must contain both letters and numbers.';
+        UI.shake('auth-card');
         return;
       }
     }
 
     const msg = isRegister
-      ? { type: 'register', username, password, role: currentRole, room_code: roomCode, room_name: roomName }
+      ? { type: 'register', username, password, role: currentRole }
       : { type: 'login', username, password };
 
     brandDot.classList.remove('online');
@@ -138,60 +152,31 @@ const Auth = (() => {
   }
 
   function setupAuthListeners() {
-    DoubtNetAPI.off('auth_ok');
     DoubtNetAPI.off('auth_error');
-    DoubtNetAPI.off('needs_room');
+    DoubtNetAPI.off('rooms_list');
 
-    DoubtNetAPI.on('auth_ok', (data) => {
+    DoubtNetAPI.on('rooms_list', (data) => {
       authError.textContent = '';
-      needsRoomError.textContent = '';
       brandDot.classList.add('online');
-      App.onAuthenticated(data.username, data.role, data.state, data.room_code, data.room_name);
+      if (data.protocol_version && data.protocol_version !== 'v1.2') {
+        console.warn('Protocol version mismatch! Client: v1.2, Server: ' + data.protocol_version);
+      }
+      App.showRoomPicker(data.username, data.role, data.rooms);
     });
 
     DoubtNetAPI.on('auth_error', (data) => {
       brandDot.classList.remove('online');
       authError.textContent = data.message || 'Authentication failed.';
-      needsRoomError.textContent = data.message || 'Action failed.';
-      if (document.getElementById('needs-room-screen').classList.contains('hidden')) {
+      const pickerError = document.getElementById('picker-error');
+      if (pickerError) pickerError.textContent = data.message || 'Action failed.';
+      
+      if (!document.getElementById('room-picker-screen').classList.contains('hidden')) {
+        UI.shake('room-picker-screen');
+      } else {
         UI.shake('auth-card');
-      } else {
-        UI.shake('needs-room-card');
-      }
-    });
-
-    DoubtNetAPI.on('needs_room', (data) => {
-      authError.textContent = '';
-      UI.showScreen('needs-room-screen');
-      if (data.role === 'teacher') {
-        teacherSetup.classList.remove('hidden');
-        studentSetup.classList.add('hidden');
-      } else {
-        studentSetup.classList.remove('hidden');
-        teacherSetup.classList.add('hidden');
       }
     });
   }
 
-  function handleCreateRoom() {
-    const roomName = document.getElementById('create-room-name-input').value.trim();
-    if (!roomName) {
-      needsRoomError.textContent = 'Room name cannot be empty.';
-      return;
-    }
-    setupAuthListeners();
-    DoubtNetAPI.send({ type: 'create_room', room_name: roomName });
-  }
-
-  function handleJoinRoom() {
-    const roomCode = document.getElementById('join-room-code-input').value.trim();
-    if (!roomCode) {
-      needsRoomError.textContent = 'Room code cannot be empty.';
-      return;
-    }
-    setupAuthListeners();
-    DoubtNetAPI.send({ type: 'join_room', room_code: roomCode });
-  }
-
-  return { init };
+  return { init, setupAuthListeners };
 })();

@@ -6,37 +6,25 @@
  */
 
 const Theme = (() => {
-  const THEMES = ['dark', 'light', 'cyber', 'midnight'];
+  const THEMES = ['corkboard'];
 
   function getCurrent() {
-    return localStorage.getItem('doubtnet-theme') || 'dark';
+    return localStorage.getItem('doubtnet-theme') || 'corkboard';
   }
 
   function apply(name) {
     document.documentElement.setAttribute('data-theme', name);
     localStorage.setItem('doubtnet-theme', name);
-
-    const btn = document.querySelector('.theme-btn');
-    if (btn) {
-      btn.textContent = name.charAt(0).toUpperCase() + name.slice(1);
-    }
   }
 
   function cycle() {
     const current = getCurrent();
-    const idx = THEMES.indexOf(current);
-    const next = THEMES[(idx + 1) % THEMES.length];
-    apply(next);
+    const nextIdx = (THEMES.indexOf(current) + 1) % THEMES.length;
+    apply(THEMES[nextIdx]);
   }
 
   function init() {
     apply(getCurrent());
-
-    document.addEventListener('click', (e) => {
-      if (e.target.closest('.theme-btn')) {
-        cycle();
-      }
-    });
   }
 
   return { init, cycle, apply, getCurrent, THEMES };

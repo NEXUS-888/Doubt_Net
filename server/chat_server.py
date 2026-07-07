@@ -7,6 +7,8 @@ Routes messages based on user role (student vs teacher) and scopes them per room
 
 import asyncio
 import json
+import time
+from typing import Optional
 
 import users
 import rooms
@@ -16,10 +18,62 @@ import cluster as cluster_module
 import points
 import protocol
 from connection_manager import ConnectionManager
+import functools
+
+async def _to_thread(func, *args, **kwargs):
+    loop = asyncio.get_event_loop()
+    func_call = functools.partial(func, *args, **kwargs)
+    return await loop.run_in_executor(None, func_call)
 
 
-async def _authenticate(websocket) -> dict | None:
-    """Register/login handshake. Returns {username, role, room_code} or None."""
+# --------------- Rate Limiter (H-2) ---------------
+
+MAX_MESSAGES_PER_SECOND = 15
+MAX_RATE_VIOLATIONS = 50
+MAX_DOUBTS_PER_STUDENT_PER_DAY = 10
+VALID_URGENCIES = {"clarification", "feedback", "blocking"}
+MAX_DOUBT_TEXT_LENGTH = 500
+MIN_DOUBT_TEXT_LENGTH = 10
+MAX_DRAFT_TEXT_LENGTH = 2000
+
+
+class _RateLimiter:
+    """Sliding-window rate limiter per connection."""
+
+    def __init__(self, max_per_second: int = MAX_MESSAGES_PER_SECOND):
+        self._timestamps: list[float] = []
+        self._max_per_second = max_per_second
+        self._violations = 0
+
+    def check(self) -> bool:
+        """Returns True if the message is allowed, False if rate-limited."""
+        now = time.monotonic()
+        # Keep only timestamps within the last second
+        self._timestamps = [t for t in self._timestamps if now - t < 1.0]
+        if len(self._timestamps) >= self._max_per_second:
+            self._violations += 1
+            return False
+        self._timestamps.append(now)
+        return True
+
+    @property
+    def should_disconnect(self) -> bool:
+        return self._violations > MAX_RATE_VIOLATIONS
+
+
+async def _send_rooms_list(websocket, username: str, role: str):
+    """Helper: fetch user's rooms and send the rooms_list message."""
+    room_codes = await _to_thread(users.get_room_codes, username)
+    room_list = await _to_thread(rooms.get_rooms_by_codes, room_codes)
+    await websocket.send(protocol.msg_rooms_list(username, role, room_list))
+
+
+async def _authenticate(websocket) -> Optional[dict]:
+    """Register/login handshake + room picker. Returns {username, role, room_code} or None."""
+    username = None
+    role = None
+    authenticated = False
+
     async for raw in websocket:
         try:
             data = protocol.decode(raw)
@@ -29,90 +83,94 @@ async def _authenticate(websocket) -> dict | None:
 
         msg_type = data.get("type")
 
-        if msg_type == "register":
+        # ---- Phase 1: Register or Login ----
+        if msg_type == "register" and not authenticated:
             username = str(data.get("username", "")).strip()
             password = str(data.get("password", ""))
             role = str(data.get("role", "student"))
-            room_code = data.get("room_code")
-            room_name = data.get("room_name")
 
-            if role == "student":
-                ok, message = await asyncio.to_thread(users.register, username, password, "student", room_code)
-                if ok:
-                    room = await asyncio.to_thread(rooms.get_room, room_code)
-                    state = await asyncio.to_thread(sched.get_current_state, room_code)
-                    await websocket.send(protocol.msg_auth_ok(username, "student", state, room_code, room["name"]))
-                    return {"username": username, "role": "student", "room_code": room_code}
-                else:
-                    await websocket.send(protocol.msg_auth_error(message))
+            ok, message = await _to_thread(users.register, username, password, role)
+            if ok:
+                authenticated = True
+                print(f"[AUTH] {username} registered as {role}")
+                await websocket.send(protocol.msg_auth_ok(username, role, {}))
+                await _send_rooms_list(websocket, username, role)
             else:
-                # Teacher registration
-                if not room_name or not room_name.strip():
-                    await websocket.send(protocol.msg_auth_error("Room name is required for teachers."))
-                    continue
-                ok, message = await asyncio.to_thread(users.register, username, password, "teacher")
-                if ok:
-                    # Create the room for the teacher
-                    room = await asyncio.to_thread(rooms.create_room, username, room_name.strip())
-                    await asyncio.to_thread(users.set_room_code, username, room["code"])
-                    state = await asyncio.to_thread(sched.get_current_state, room["code"])
-                    await websocket.send(protocol.msg_auth_ok(username, "teacher", state, room["code"], room["name"]))
-                    return {"username": username, "role": "teacher", "room_code": room["code"]}
-                else:
-                    await websocket.send(protocol.msg_auth_error(message))
+                print(f"[AUTH] Registration failed for {username}: {message}")
+                await websocket.send(protocol.msg_auth_error(message))
 
-        elif msg_type == "login":
+        elif msg_type == "login" and not authenticated:
             username = str(data.get("username", "")).strip()
             password = str(data.get("password", ""))
-            ok, user_info = await asyncio.to_thread(users.verify_login, username, password)
+            ok, user_info = await _to_thread(users.verify_login, username, password)
             if ok:
                 role = user_info["role"]
-                room_code = user_info["room_code"]
-
-                # Handle legacy user without a room
-                if not room_code:
-                    await websocket.send(protocol.msg_needs_room(role))
-                    # Wait for room creation/joining message
-                    async for next_raw in websocket:
-                        try:
-                            next_data = protocol.decode(next_raw)
-                        except:
-                            await websocket.send(protocol.msg_auth_error("Malformed request."))
-                            break
-                        
-                        next_type = next_data.get("type")
-                        if next_type == "create_room" and role == "teacher":
-                            r_name = str(next_data.get("room_name", "")).strip()
-                            if not r_name:
-                                await websocket.send(protocol.msg_auth_error("Room name required."))
-                                continue
-                            room = await asyncio.to_thread(rooms.create_room, username, r_name)
-                            await asyncio.to_thread(users.set_room_code, username, room["code"])
-                            state = await asyncio.to_thread(sched.get_current_state, room["code"])
-                            await websocket.send(protocol.msg_auth_ok(username, "teacher", state, room["code"], room["name"]))
-                            return {"username": username, "role": "teacher", "room_code": room["code"]}
-                        elif next_type == "join_room" and role == "student":
-                            r_code = str(next_data.get("room_code", "")).strip()
-                            join_ok, join_res = await asyncio.to_thread(rooms.join_room, username, r_code)
-                            if join_ok:
-                                await asyncio.to_thread(users.set_room_code, username, join_res["code"])
-                                state = await asyncio.to_thread(sched.get_current_state, join_res["code"])
-                                await websocket.send(protocol.msg_auth_ok(username, "student", state, join_res["code"], join_res["name"]))
-                                return {"username": username, "role": "student", "room_code": join_res["code"]}
-                            else:
-                                await websocket.send(protocol.msg_auth_error(join_res))
-                        else:
-                            await websocket.send(protocol.msg_auth_error("Please create or join a room first."))
-                    return None
-
-                room = await asyncio.to_thread(rooms.get_room, room_code)
-                state = await asyncio.to_thread(sched.get_current_state, room_code)
-                await websocket.send(protocol.msg_auth_ok(username, role, state, room_code, room["name"]))
-                return {"username": username, "role": role, "room_code": room_code}
+                authenticated = True
+                print(f"[AUTH] {username} logged in as {role}")
+                await websocket.send(protocol.msg_auth_ok(username, role, {}))
+                await _send_rooms_list(websocket, username, role)
             else:
+                print(f"[AUTH] Login failed for {username}: {user_info}")
                 await websocket.send(protocol.msg_auth_error(user_info))
 
-        else:
+        # ---- Phase 2: Room Picker actions (after authenticated) ----
+        elif msg_type == "select_room" and authenticated:
+            room_code = str(data.get("room_code", "")).strip().upper()
+            print(f"[ROOM] {username} selecting room {room_code}")
+            # Verify user belongs to this room
+            user_codes = await _to_thread(users.get_room_codes, username)
+            print(f"[ROOM] {username} has rooms: {user_codes}")
+            if room_code not in [c.upper() for c in user_codes]:
+                print(f"[ROOM] {username} NOT member of {room_code}")
+                await websocket.send(protocol.msg_auth_error("You are not a member of that room."))
+                continue
+            room = await _to_thread(rooms.get_room, room_code)
+            if not room:
+                print(f"[ROOM] Room {room_code} not found")
+                await websocket.send(protocol.msg_auth_error("Room not found."))
+                continue
+            state = await _to_thread(sched.get_current_state, room_code)
+            print(f"[ROOM] {username} entering room {room_code} ({room['name']})")
+            await websocket.send(protocol.msg_room_entered(username, role, state, room_code, room["name"]))
+            return {"username": username, "role": role, "room_code": room_code}
+
+        elif msg_type == "create_room" and authenticated and role == "teacher":
+            room_name = str(data.get("room_name", "")).strip()
+            room_code = data.get("room_code")
+            if not room_name or len(room_name) < 3 or len(room_name) > 50:
+                await websocket.send(protocol.msg_auth_error("Room name must be 3-50 characters."))
+                continue
+            import re
+            if not re.match(r'^[a-zA-Z0-9\s\-_]+$', room_name):
+                await websocket.send(protocol.msg_auth_error("Room name contains invalid characters."))
+                continue
+            room = await _to_thread(rooms.create_room, username, room_name, room_code)
+            await _to_thread(users.add_room_code, username, room["code"])
+            # Auto-enter the created room
+            state = await _to_thread(sched.get_current_state, room["code"])
+            await websocket.send(protocol.msg_room_entered(username, role, state, room["code"], room["name"]))
+            return {"username": username, "role": role, "room_code": room["code"]}
+
+        elif msg_type == "join_room" and authenticated and role == "student":
+            room_code = str(data.get("room_code", "")).strip().upper()
+            print(f"[ROOM] Student {username} joining room {room_code}")
+            if not room_code:
+                await websocket.send(protocol.msg_auth_error("Room code is required."))
+                continue
+            join_ok, join_res = await _to_thread(rooms.join_room, username, room_code)
+            print(f"[ROOM] join_room result: ok={join_ok}, res={join_res}")
+            if join_ok:
+                await _to_thread(users.add_room_code, username, join_res["code"])
+                # Auto-enter the joined room
+                state = await _to_thread(sched.get_current_state, join_res["code"])
+                print(f"[ROOM] Student {username} entering room {join_res['code']} ({join_res['name']})")
+                await websocket.send(protocol.msg_room_entered(username, role, state, join_res["code"], join_res["name"]))
+                return {"username": username, "role": role, "room_code": join_res["code"]}
+            else:
+                print(f"[ROOM] Join failed for {username}: {join_res}")
+                await websocket.send(protocol.msg_auth_error(join_res))
+
+        elif not authenticated:
             await websocket.send(protocol.msg_auth_error("Register or log in first."))
 
     return None
@@ -136,6 +194,7 @@ async def handle_connection(websocket, manager: ConnectionManager):
     room_code = auth["room_code"]
 
     if await manager.is_username_online(username):
+        print(f"[!] {username} already online — kicking old connection")
         await manager.kick_username(username)
 
     await manager.add(websocket, username, role, room_code)
@@ -146,9 +205,22 @@ async def handle_connection(websocket, manager: ConnectionManager):
 
     sch = sched.get_schedule(room_code)
     ws = _week_start(sch)
+    rate_limiter = _RateLimiter()
 
     try:
         async for raw in websocket:
+            # --- Rate limiting (H-2) ---
+            if not rate_limiter.check():
+                try:
+                    await websocket.send(protocol.msg_error("Rate limit exceeded. Slow down."))
+                except Exception:
+                    pass
+                if rate_limiter.should_disconnect:
+                    print(f"[!] Rate limit abuse by {username} — disconnecting")
+                    await websocket.close(1008, "Rate limit abuse")
+                    return
+                continue
+
             try:
                 data = protocol.decode(raw)
             except (json.JSONDecodeError, ValueError):
@@ -161,9 +233,9 @@ async def handle_connection(websocket, manager: ConnectionManager):
 
             try:
                 if role == "student":
-                    await _handle_student_message(websocket, manager, username, msg_type, data, ws, room_code)
+                    await _handle_student_message(websocket, manager, username, msg_type, data, ws, room_code, role)
                 elif role == "teacher":
-                    await _handle_teacher_message(websocket, manager, username, msg_type, data, ws, room_code)
+                    await _handle_teacher_message(websocket, manager, username, msg_type, data, ws, room_code, role)
                 else:
                     await websocket.send(protocol.msg_error("Unknown role."))
             except Exception as e:
@@ -171,15 +243,35 @@ async def handle_connection(websocket, manager: ConnectionManager):
                 await websocket.send(protocol.msg_error(f"Server error: {str(e)[:100]}"))
 
     except Exception as e:
-        print(f"[!] Connection error with {username} ({addr}) in room {room_code}: {e}")
+        print(f"[!] Connection error with {username} ({addr}) in room {room_code}: {type(e).__name__}: {e}")
     finally:
         await manager.remove(websocket)
-        print(f"[-] {username} disconnected: {addr} from room {room_code}")
+        close_code = getattr(websocket, "close_code", None)
+        close_reason = getattr(websocket, "close_reason", None)
+        print(f"[-] {username} disconnected: {addr} from room {room_code} (code={close_code}, reason={close_reason})")
         online_users = await manager.usernames_in_room(room_code)
         await manager.broadcast_to_room(room_code, protocol.msg_presence(online_users))
 
 
-async def _handle_student_message(websocket, manager, username, msg_type, data, ws, room_code):
+async def _handle_student_message(websocket, manager, username, msg_type, data, ws, room_code, role):
+    # Enforce role boundaries for student-only messages
+    student_only_messages = {"submit_doubt", "autosave_draft", "get_draft", "get_my_doubts", "get_my_points"}
+    if msg_type in student_only_messages and role != "student":
+        await websocket.send(protocol.msg_error("Unauthorized: Student role required."))
+        return
+
+    # Enforce role boundaries for teacher-only messages sent by students
+    teacher_messages = {
+        "get_schedule", "set_schedule", "get_doubts", "moderate_doubt", 
+        "auto_cluster", "get_clusters", "merge_clusters", "split_cluster", 
+        "undo_cluster", "finalize_clusters", "get_resolution_queue", 
+        "resolve_doubt", "start_demo_mode", "stop_demo_mode", 
+        "toggle_allow_all_doubts", "pin_doubt"
+    }
+    if msg_type in teacher_messages and role != "teacher":
+        await websocket.send(protocol.msg_error("Unauthorized: Teacher role required."))
+        return
+
     if msg_type == "get_state":
         state = sched.get_current_state(room_code)
         await websocket.send(protocol.encode(state))
@@ -187,11 +279,30 @@ async def _handle_student_message(websocket, manager, username, msg_type, data, 
     elif msg_type == "submit_doubt":
         text = str(data.get("text", "")).strip()
         urgency = str(data.get("urgency", "clarification"))
+
+        # --- Input validation (H-3) ---
+        if len(text) < MIN_DOUBT_TEXT_LENGTH:
+            await websocket.send(protocol.msg_error(f"Doubt must be at least {MIN_DOUBT_TEXT_LENGTH} characters."))
+            return
+        if len(text) > MAX_DOUBT_TEXT_LENGTH:
+            await websocket.send(protocol.msg_error(f"Doubt must be at most {MAX_DOUBT_TEXT_LENGTH} characters."))
+            return
+        if urgency not in VALID_URGENCIES:
+            await websocket.send(protocol.msg_error(f"Invalid urgency. Must be one of: {', '.join(sorted(VALID_URGENCIES))}."))
+            return
+
         state = sched.get_current_state(room_code)
         if state.get("phase") not in ("doubt_window", "grace_period"):
             await websocket.send(protocol.msg_error("Doubt window is not open."))
             return
         day = state.get("day", 1)
+
+        # --- Per-student doubt limit (H-4) ---
+        existing_count = doubts.count_student_doubts_for_day(username, day, ws, room_code)
+        if existing_count >= MAX_DOUBTS_PER_STUDENT_PER_DAY:
+            await websocket.send(protocol.msg_error(f"Doubt limit reached ({MAX_DOUBTS_PER_STUDENT_PER_DAY} per day). Try again tomorrow."))
+            return
+
         result = doubts.submit_doubt(username, text, urgency, day, ws, room_code)
         await websocket.send(protocol.msg_doubt_submitted(result["doubt_id"], result["status"]))
         if not result.get("flagged"):
@@ -203,19 +314,15 @@ async def _handle_student_message(websocket, manager, username, msg_type, data, 
 
     elif msg_type == "autosave_draft":
         text = str(data.get("text", ""))
-        await asyncio.to_thread(doubts.autosave_draft, username, text, ws, room_code)
+        # Cap draft size (H-3 defense-in-depth)
+        if len(text) > MAX_DRAFT_TEXT_LENGTH:
+            text = text[:MAX_DRAFT_TEXT_LENGTH]
+        await _to_thread(doubts.autosave_draft, username, text, ws, room_code)
         await websocket.send(protocol.msg_draft_saved())
 
     elif msg_type == "get_draft":
-        draft = await asyncio.to_thread(doubts.get_draft, username, ws, room_code)
+        draft = await _to_thread(doubts.get_draft, username, ws, room_code)
         await websocket.send(protocol.encode({"type": "draft", "text": draft}))
-
-    elif msg_type == "pin_doubt":
-        if role == "teacher":
-            doubt_id = data.get("id")
-            await asyncio.to_thread(sched.set_pinned_doubt, doubt_id, room_code)
-            new_state = await asyncio.to_thread(sched.get_current_state, room_code)
-            await manager.broadcast_to_room(room_code, protocol.msg_state(new_state))
 
     elif msg_type == "get_my_doubts":
         my_doubts = doubts.get_student_doubts(username, ws, room_code)
@@ -248,7 +355,18 @@ async def _handle_student_message(websocket, manager, username, msg_type, data, 
         await websocket.send(protocol.msg_error(f"Unknown message type: {msg_type}"))
 
 
-async def _handle_teacher_message(websocket, manager, username, msg_type, data, ws, room_code):
+async def _handle_teacher_message(websocket, manager, username, msg_type, data, ws, room_code, role):
+    # Enforce role boundaries for teacher-only messages
+    if role != "teacher":
+        await websocket.send(protocol.msg_error("Unauthorized: Teacher role required."))
+        return
+
+    # Enforce role boundaries for student-only messages sent by teachers
+    student_only_messages = {"submit_doubt", "autosave_draft", "get_draft", "get_my_doubts", "get_my_points"}
+    if msg_type in student_only_messages and role != "student":
+        await websocket.send(protocol.msg_error("Unauthorized: Student role required."))
+        return
+
     if msg_type == "get_state":
         state = sched.get_current_state(room_code)
         await websocket.send(protocol.encode(state))
@@ -294,7 +412,10 @@ async def _handle_teacher_message(websocket, manager, username, msg_type, data, 
             for did in cdata["doubt_ids"]:
                 doubts.set_cluster_id(did, cid, ws, room_code)
         doubts.store_clusters(ws, clusters, room_code)
-        await websocket.send(protocol.msg_clusters(clusters))
+        warning = None
+        if not cluster_module.HAS_SKLEARN:
+            warning = "scikit-learn is not installed on the server. Falling back to basic 1-to-1 clustering."
+        await websocket.send(protocol.msg_clusters(clusters, warning=warning))
 
     elif msg_type == "get_clusters":
         clusters = doubts.get_clusters(ws, room_code)
@@ -363,6 +484,12 @@ async def _handle_teacher_message(websocket, manager, username, msg_type, data, 
         sched.set_allow_all_doubts(enabled, room_code)
         state = sched.get_current_state(room_code)
         await manager.broadcast_to_room(room_code, protocol.msg_state_update(state))
+
+    elif msg_type == "pin_doubt":
+        doubt_id = data.get("id")
+        await _to_thread(sched.set_pinned_doubt, doubt_id, room_code)
+        new_state = await _to_thread(sched.get_current_state, room_code)
+        await manager.broadcast_to_room(room_code, protocol.msg_state_update(new_state))
 
     else:
         await websocket.send(protocol.msg_error(f"Unknown message type: {msg_type}"))

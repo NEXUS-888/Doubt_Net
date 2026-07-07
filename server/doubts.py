@@ -10,6 +10,7 @@ import threading
 import uuid
 from datetime import datetime
 import moderation
+from typing import Optional
 
 _lock = threading.RLock()
 
@@ -73,27 +74,27 @@ def get_resolved_clusters(week_start: str, room_code: str) -> list:
 
 def submit_doubt(username: str, text: str, urgency: str, day: int, week_start: str, room_code: str) -> dict:
     """Submit a doubt. Runs moderation filter. Returns result dict."""
-    existing = get_doubts_for_week(week_start, room_code)
-    mod_result = moderation.check_doubt(text, username, existing)
-    doubt_id = f"d_{uuid.uuid4().hex[:8]}"
-
-    entry = {
-        "id": doubt_id,
-        "text": text,
-        "username": username,
-        "day": day,
-        "ts": datetime.now().timestamp(),
-        "urgency": urgency,
-        "status": "pending",
-        "cluster_id": None,
-        "moderation": {
-            "auto_flag": mod_result.get("flag"),
-            "teacher_approved": None,
-        },
-    }
-
     _ensure_week(week_start, room_code)
     with _lock:
+        existing = get_doubts_for_week(week_start, room_code)
+        mod_result = moderation.check_doubt(text, username, existing)
+        doubt_id = f"d_{uuid.uuid4().hex[:8]}"
+
+        entry = {
+            "id": doubt_id,
+            "text": text,
+            "username": username,
+            "day": day,
+            "ts": datetime.now().timestamp(),
+            "urgency": urgency,
+            "status": "pending",
+            "cluster_id": None,
+            "moderation": {
+                "auto_flag": mod_result.get("flag"),
+                "teacher_approved": None,
+            },
+        }
+
         data = _load(room_code)
 
         if mod_result.get("flagged"):
@@ -153,6 +154,16 @@ def get_student_doubts(username: str, week_start: str, room_code: str) -> list:
     return [d for d in get_doubts_for_week(week_start, room_code) if d.get("username") == username]
 
 
+def count_student_doubts_for_day(username: str, day: int, week_start: str, room_code: str) -> int:
+    """Count non-rejected doubts submitted by a student for a specific day."""
+    return len([
+        d for d in get_doubts_for_week(week_start, room_code)
+        if d.get("username") == username
+        and d.get("day") == day
+        and d.get("status") != "rejected"
+    ])
+
+
 def get_pending_moderation(week_start: str, room_code: str) -> list:
     return [d for d in get_doubts_for_week(week_start, room_code) if d.get("status") == "flagged"]
 
@@ -210,7 +221,7 @@ def clear_week(week_start: str, room_code: str):
         _save(data, room_code)
 
 
-def get_doubt_by_id(doubt_id: str, room_code: str) -> dict | None:
+def get_doubt_by_id(doubt_id: str, room_code: str) -> Optional[dict]:
     with _lock:
         data = _load(room_code)
         for d in data.get("doubts", []):

@@ -6,50 +6,87 @@
 <title>DoubtNet — Anonymous Doubt Resolution</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Permanent+Marker&family=Special+Elite&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 
-<link rel="stylesheet" href="css/theme.css">
-<link rel="stylesheet" href="css/animations.css">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src ws: wss:; img-src 'self' data:;">
+
+<link rel="stylesheet" href="css/theme.css?v=1.2">
+<link rel="stylesheet" href="css/animations.css?v=1.2">
 </head>
 <body>
 
 <div class="bg-grid" aria-hidden="true"></div>
-<div class="bg-glow" aria-hidden="true"></div>
+
+<!-- ============ LANDING SCREEN ============ -->
+<main id="landing-screen" class="screen">
+  <header class="landing-header">
+    <div class="brand">
+      <h1 class="chalk-wordmark">Doubtnet</h1>
+    </div>
+    <nav class="landing-nav">
+      <button class="nav-tab-quiet" id="landing-about-btn">About</button>
+      <button class="nav-tab-quiet" id="landing-login-btn">Log in</button>
+      <button class="nav-tab-filled" id="landing-signup-btn">Sign up</button>
+    </nav>
+  </header>
+
+  <div class="landing-container">
+    <section class="landing-hero">
+      <h2 class="chalk-hero-title">Ask doubts anonymously.<br>Resolve them fearlessly.</h2>
+      <p class="typewriter-subhead">A real-time classroom communication board where every query is a pinned note waiting for clarification.</p>
+    </section>
+
+    <section class="landing-cards-container">
+      <div class="pinned-note pending" style="transform: rotate(-2.5deg);">
+        <div class="pushpin"></div>
+        <div class="note-content">You submit doubts or constructive session feedback anonymously, without fear of judgment.</div>
+      </div>
+      <div class="pinned-note approved" style="transform: rotate(1.8deg);">
+        <div class="pushpin"></div>
+        <div class="note-content">Speakers start instant live Webinars or configure structured Class Weeks to fit any lecture style.</div>
+      </div>
+      <div class="pinned-note flagged" style="transform: rotate(-1.5deg);">
+        <div class="pushpin"></div>
+        <div class="note-content">Group similar questions dynamically via AI clustering, resolve doubts, and score leaderboard points.</div>
+      </div>
+    </section>
+
+    <div class="landing-cta-container">
+      <button class="landing-cta-btn" id="landing-start-btn">Pin a Doubt</button>
+    </div>
+  </div>
+
+  <footer class="landing-footer">
+    <span class="typewriter-footer">Classroom network online — awaiting doubt window status</span>
+  </footer>
+</main>
 
 <!-- ============ AUTH SCREEN ============ -->
-<main id="auth-screen" class="screen">
+<main id="auth-screen" class="screen hidden">
   <div class="auth-card" id="auth-card">
-    <div class="brand">
+    <div class="auth-header-row">
       <span class="brand-dot" id="brand-dot"></span>
-      <h1>DOUBTNET</h1>
+      <h1 class="chalk-wordmark">Doubtnet</h1>
     </div>
-    <p class="brand-sub">Anonymous doubt resolution — submit questions without fear.</p>
+    <p class="typewriter-subhead">Anonymous doubt resolution — submit questions without fear.</p>
 
-    <div class="tab-row" role="tablist">
-      <button class="tab active" id="tab-login" role="tab" aria-selected="true">Log in</button>
-      <button class="tab" id="tab-register" role="tab" aria-selected="false">Register</button>
+    <div class="paper-tabs-row" role="tablist">
+      <button class="paper-tab active" id="tab-login" role="tab" aria-selected="true">Log in</button>
+      <button class="paper-tab" id="tab-register" role="tab" aria-selected="false">Register</button>
     </div>
-    <div class="tab-row role-row" role="tablist" id="role-row">
-      <button class="tab active" id="role-student" role="tab" data-role="student">Student</button>
-      <button class="tab" id="role-teacher" role="tab" data-role="teacher">Teacher</button>
+    <div class="paper-tabs-row role-row hidden" role="tablist" id="role-row">
+      <button class="paper-tab active" id="role-student" role="tab" data-role="student">Student</button>
+      <button class="paper-tab" id="role-teacher" role="tab" data-role="teacher">Teacher</button>
     </div>
 
-    <form id="auth-form" autocomplete="off">
+    <form id="auth-form" autocomplete="off" onsubmit="return false">
       <label class="field">
         <span>Username</span>
         <input type="text" id="username-input" name="username" maxlength="20" required autocomplete="off">
       </label>
       <label class="field">
         <span>Password</span>
-        <input type="password" id="password-input" name="password" maxlength="64" required autocomplete="off">
-      </label>
-      <label class="field hidden" id="room-code-field">
-        <span>Room Code</span>
-        <input type="text" id="room-code-input" placeholder="e.g. PHYS-3847" autocomplete="off">
-      </label>
-      <label class="field hidden" id="room-name-field">
-        <span>Room Name</span>
-        <input type="text" id="room-name-input" placeholder="e.g. Physics Class" autocomplete="off">
+        <input type="text" id="password-input" name="doubtnet_pass" maxlength="64" required autocomplete="off" style="-webkit-text-security: disc;">
       </label>
 
       <div id="auth-error" class="auth-error" role="alert" aria-live="polite"></div>
@@ -59,45 +96,60 @@
       </button>
     </form>
 
-    <div class="server-config">
-      <label>
-        <span>Server</span>
-        <input type="text" id="server-url-input" value="ws://10.136.99.209:8765" autocomplete="off">
-      </label>
+    <div class="server-config-typewritten">
+      <span>// server url:</span>
+      <input type="text" id="server-url-input" value="" placeholder="ws://localhost:8765" autocomplete="off">
     </div>
   </div>
 </main>
 
-<!-- ============ NEEDS ROOM SCREEN ============ -->
-<main id="needs-room-screen" class="screen hidden">
-  <div class="auth-card" id="needs-room-card">
+<!-- ============ ROOM PICKER SCREEN ============ -->
+<main id="room-picker-screen" class="screen hidden">
+  <header class="picker-header">
     <div class="brand">
-      <span class="brand-dot"></span>
-      <h1>DOUBTNET</h1>
+      <h1 class="chalk-wordmark">Doubtnet</h1>
     </div>
-    <p class="brand-sub">Setup your class room to continue.</p>
+    <div class="picker-header-right">
+      <span class="me-label" id="picker-me-label"></span>
+      <button class="btn-ghost" id="picker-logout-btn">Log out</button>
+    </div>
+  </header>
 
-    <div id="teacher-setup-area" class="hidden">
-      <form id="create-room-form" autocomplete="off">
+  <div class="picker-body">
+    <h2 class="chalk-hero-title" style="font-size:28px; margin-bottom:8px;">Your Rooms</h2>
+    <p class="typewriter-subhead" id="picker-subtitle">Select a room to enter, or create a new one.</p>
+
+    <div class="rooms-grid" id="rooms-grid">
+      <!-- Room cards rendered dynamically by app.js -->
+    </div>
+
+    <div id="picker-error" class="auth-error" role="alert" aria-live="polite"></div>
+
+    <!-- Teacher: Create Room action card -->
+    <div id="picker-create-area" class="picker-action-card hidden">
+      <div class="pushpin"></div>
+      <h3 class="picker-action-title">Create a New Room</h3>
+      <form id="picker-create-form" autocomplete="off" onsubmit="return false">
         <label class="field">
           <span>Room Name</span>
-          <input type="text" id="create-room-name-input" placeholder="e.g. Science Room" required autocomplete="off">
+          <input type="text" id="picker-create-name" placeholder="e.g. Physics 101" required autocomplete="off">
         </label>
         <button type="submit" class="btn-primary">Create Room</button>
       </form>
     </div>
 
-    <div id="student-setup-area" class="hidden">
-      <form id="join-room-form" autocomplete="off">
+    <!-- Student: Join Room action card -->
+    <div id="picker-join-area" class="picker-action-card hidden">
+      <div class="pushpin"></div>
+      <h3 class="picker-action-title">Join a Room</h3>
+      <form id="picker-join-form" autocomplete="off" onsubmit="return false">
         <label class="field">
           <span>Room Code</span>
-          <input type="text" id="join-room-code-input" placeholder="e.g. PHYS-3847" required autocomplete="off">
+          <input type="text" id="picker-join-code" placeholder="e.g. X8J9K2" required autocomplete="off">
         </label>
         <button type="submit" class="btn-primary">Join Room</button>
       </form>
     </div>
-
-    <div id="needs-room-error" class="auth-error" role="alert" aria-live="polite"></div>
   </div>
 </main>
 
@@ -106,7 +158,7 @@
   <header class="dash-header">
     <div class="dash-header-left">
       <span class="brand-dot"></span>
-      <h1>DOUBTNET</h1>
+      <h1 class="chalk-wordmark-sm">Doubtnet</h1>
       <span id="student-room-display" class="room-badge"></span>
     </div>
     <div class="dash-header-center">
@@ -134,14 +186,16 @@
         <div class="phase-text" id="phase-text">Waiting for class...</div>
       </div>
 
-      <div class="doubt-form-area" id="doubt-form-area">
-        <div class="doubt-input-wrap">
+      <div class="doubt-form" id="doubt-form-area">
+        <div class="doubt-input-wrapper">
           <textarea id="doubt-input" class="doubt-input" placeholder="What's your doubt? Be specific..." maxlength="500" rows="4"></textarea>
-          <span class="char-counter" id="char-counter">0/500</span>
-          <span class="autosave-indicator" id="autosave-indicator"></span>
+          <div class="textarea-footer">
+            <span class="char-counter" id="char-counter">0/500</span>
+            <span class="autosave-indicator" id="autosave-indicator"></span>
+          </div>
         </div>
 
-        <div class="urgency-row">
+        <div class="urgency-selector">
           <label class="urgency-option active" data-urgency="clarification">
             <input type="radio" name="urgency" value="clarification" checked hidden>
             <span class="urgency-dot"></span>
@@ -151,6 +205,11 @@
             <input type="radio" name="urgency" value="blocking" hidden>
             <span class="urgency-dot urgency-dot-high"></span>
             <span>Blocking — I'm lost</span>
+          </label>
+          <label class="urgency-option" data-urgency="feedback">
+            <input type="radio" name="urgency" value="feedback" hidden>
+            <span class="urgency-dot" style="background-color: var(--pin-pending);"></span>
+            <span>Feedback</span>
           </label>
         </div>
 
@@ -162,16 +221,16 @@
     <!-- Right: My doubts -->
     <section class="my-doubts-panel" id="my-doubts-panel">
       <h2 class="panel-title">My Doubts This Week</h2>
-      <div class="my-doubts-list" id="my-doubts-list">
-        <p class="empty-state">No doubts submitted yet.</p>
+      <div class="my-doubts-list-board" id="my-doubts-list">
+        <p class="empty-state">No doubts pinned yet — be the first.</p>
       </div>
     </section>
   </div>
 
   <!-- Leaderboard preview -->
-  <div class="leaderboard-preview hidden" id="leaderboard-preview">
-    <h2>Leaderboard</h2>
-    <div id="student-leaderboard-body"></div>
+  <div class="leaderboard-preview-container hidden" id="leaderboard-preview">
+    <h2 class="panel-title-chalk">Leaderboard</h2>
+    <div id="student-leaderboard-body" class="leaderboard-notes-row"></div>
   </div>
 </main>
 
@@ -180,7 +239,7 @@
   <header class="dash-header">
     <div class="dash-header-left">
       <span class="brand-dot"></span>
-      <h1>DOUBTNET</h1>
+      <h1 class="chalk-wordmark-sm">Doubtnet</h1>
       <span class="teacher-badge">Teacher</span>
       <span id="teacher-room-display" class="room-badge"></span>
     </div>
@@ -206,50 +265,121 @@
 
   <!-- Schedule Panel -->
   <div class="teacher-panel active" id="panel-schedule">
-    <h2>Schedule Configuration</h2>
-    <div class="schedule-form">
-      <label class="field"><span>Week Start (YYYY-MM-DD)</span><input type="text" id="sched-week-start" placeholder="2026-06-30"></label>
-      <label class="field"><span>Subject</span><input type="text" id="sched-subject" placeholder="Physics"></label>
-      <div id="schedule-days"></div>
-      <button id="save-schedule-btn" class="btn-primary" style="margin-top:12px">Save Schedule</button>
-      <button id="demo-mode-btn" class="btn-ghost" style="margin-top:8px">Toggle Demo Mode</button>
-      <button id="allow-all-doubts-btn" class="btn-ghost" style="margin-top:8px; border-color:var(--dn-amber); color:var(--dn-amber)">Allow All Doubts: OFF</button>
-      <button id="export-report-btn" class="btn-primary" style="margin-top:16px; background:linear-gradient(135deg, var(--dn-emerald) 0%, rgba(16, 185, 129, 0.8) 100%); color:#fff; font-weight:700;">Export Session Report (PDF)</button>
+    <div class="schedule-layout-container" style="display: flex; gap: 40px; width: 100%; align-items: flex-start; flex-wrap: wrap;">
+      
+      <div class="schedule-left-column" style="flex: 1; min-width: 320px; max-width: 480px;">
+        <div class="schedule-form">
+          <!-- Mode Selection Paper Tabs -->
+          <div class="paper-tabs-row" id="schedule-mode-tabs" style="margin-bottom: 20px;">
+            <button class="paper-tab active" id="mode-class-btn" data-mode="class">Class Week</button>
+            <button class="paper-tab" id="mode-webinar-btn" data-mode="webinar">Webinar / Lecture</button>
+          </div>
+
+          <label class="field"><span>Subject / Webinar Name</span><input type="text" id="sched-subject" placeholder="Physics"></label>
+
+          <!-- Standard Class Fields -->
+          <div id="class-mode-fields">
+            <label class="field"><span>Week Start (YYYY-MM-DD)</span><input type="text" id="sched-week-start" placeholder="2026-06-30"></label>
+            <div id="schedule-days"></div>
+            <button id="save-schedule-btn" class="btn-primary" style="margin-top:12px">Save Schedule</button>
+          </div>
+
+          <!-- Webinar Controls -->
+          <div id="webinar-mode-fields" class="hidden" style="margin-top: 16px;">
+            <button id="toggle-webinar-btn" class="btn-primary" style="background:var(--pin-approved); color:var(--paper); border-color:var(--pin-approved);">Start Webinar Session</button>
+            <p class="typewriter-subhead" id="webinar-status-text" style="font-size:12px; margin-top:8px; text-align:center; color:var(--paper-ink);">Session is currently closed.</p>
+          </div>
+
+          <div style="margin-top: 16px; border-top: 1px dashed rgba(58, 47, 31, 0.2); padding-top: 16px;">
+            <button id="demo-mode-btn" class="btn-ghost" style="width: 100%; margin-top:8px">Toggle Demo Mode</button>
+            <button id="allow-all-doubts-btn" class="btn-ghost" style="width: 100%; margin-top:8px; border-color:var(--pin-pending); color:var(--pin-pending)">Allow All Doubts: OFF</button>
+            <button id="export-report-btn" class="btn-primary" style="margin-top:16px; background:#ead9b0; color:#3a2f1f; font-weight:700; border: 1px solid rgba(58, 47, 31, 0.2);">Export Session Report (PDF)</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="schedule-right-column" style="flex: 1.5; display: flex; gap: 24px; flex-wrap: wrap; justify-content: flex-start; min-width: 320px;">
+        <!-- Stats Card -->
+        <div class="pinned-note pending" id="schedule-stats-card" style="transform: rotate(2deg); width: 280px; min-height: 250px; flex-shrink: 0;">
+          <div class="pushpin"></div>
+          <div class="note-content-text" style="font-family: 'Permanent Marker', cursive; font-size: 22px; text-align: center; border-bottom: 2px dashed rgba(58,47,31,0.2); padding-bottom: 8px; margin-bottom: 12px;">
+            Session Stats
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 12px; font-family: 'IBM Plex Sans', sans-serif; color: var(--paper-ink); font-size: 14px;">
+            <div style="display: flex; justify-content: space-between; font-weight: bold; border-bottom: 1px dotted rgba(58,47,31,0.15); padding-bottom: 4px;">
+              <span>Audience Online:</span>
+              <span id="stats-online-count" style="font-family: 'Special Elite', monospace;">0</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; font-weight: bold; border-bottom: 1px dotted rgba(58,47,31,0.15); padding-bottom: 4px;">
+              <span>Total Doubts:</span>
+              <span id="stats-doubts-count" style="font-family: 'Special Elite', monospace;">0</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; font-weight: bold; border-bottom: 1px dotted rgba(58,47,31,0.15); padding-bottom: 4px;">
+              <span>Feedback Submitted:</span>
+              <span id="stats-feedback-count" style="font-family: 'Special Elite', monospace;">0</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; font-weight: bold;">
+              <span>Resolved Doubts:</span>
+              <span id="stats-resolved-count" style="font-family: 'Special Elite', monospace;">0</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Quick Guide Card -->
+        <div class="pinned-note approved" id="schedule-guide-card" style="transform: rotate(-1.5deg); width: 280px; min-height: 250px; flex-shrink: 0;">
+          <div class="pushpin"></div>
+          <div class="note-content-text" style="font-family: 'Permanent Marker', cursive; font-size: 20px; text-align: center; border-bottom: 2px dashed rgba(58,47,31,0.2); padding-bottom: 8px; margin-bottom: 12px;">
+            Speaker Guide
+          </div>
+          <ul style="font-family: 'Special Elite', monospace; font-size: 13px; color: var(--paper-ink); padding-left: 16px; margin: 0; line-height: 1.6;">
+            <li style="margin-bottom: 6px;">Moderation lane filters profanity. Approve notes to post them.</li>
+            <li style="margin-bottom: 6px;">Click Auto-Cluster to group similar questions using AI.</li>
+            <li style="margin-bottom: 6px;">Use the Resolution lane to discuss questions in order.</li>
+            <li>Finalizing awards points to active participants.</li>
+          </ul>
+        </div>
+      </div>
+
     </div>
   </div>
 
   <!-- Live Doubts Panel -->
   <div class="teacher-panel" id="panel-live">
-    <h2>Flagged for Review</h2>
-    <div id="moderation-list" style="margin-bottom: 24px;"><p class="empty-state">No flagged doubts.</p></div>
+    <h2 class="panel-title">Flagged for Review</h2>
+    <div id="moderation-list" class="corkboard-row" style="margin-bottom: 32px;"><p class="empty-state">No doubts pinned yet — be the first.</p></div>
 
-    <h2>Approved Doubts Feed</h2>
-    <div id="live-approved-list"><p class="empty-state">No approved doubts yet.</p></div>
+    <h2 class="panel-title">Approved Doubts Feed</h2>
+    <div id="live-approved-list" class="corkboard-row"><p class="empty-state">No doubts pinned yet — be the first.</p></div>
+
+    <!-- Pinned/scattered notes visual placeholder inside panel-live to fill void -->
+    <div class="scattered-board-decor" id="scattered-decor-board"></div>
   </div>
 
   <!-- Clusters Panel -->
   <div class="teacher-panel" id="panel-clusters">
-    <h2>Cluster Review</h2>
+    <h2 class="panel-title">Cluster Review</h2>
     <div class="cluster-actions">
       <button id="auto-cluster-btn" class="btn-primary">Auto-Cluster</button>
       <button id="undo-cluster-btn" class="btn-ghost">Undo</button>
-      <button id="finalize-clusters-btn" class="btn-primary" style="background:var(--success-green);color:#06181d">Finalize Clusters</button>
+      <button id="finalize-clusters-btn" class="btn-primary" style="background:var(--pin-approved);color:var(--paper)">Finalize Clusters</button>
     </div>
-    <div id="cluster-list"><p class="empty-state">No clusters yet. Run auto-cluster after approving doubts.</p></div>
+    <div id="cluster-list" class="corkboard-row"><p class="empty-state">No doubts pinned yet — be the first.</p></div>
   </div>
 
   <!-- Resolution Panel -->
   <div class="teacher-panel" id="panel-resolution">
-    <h2>Day 5 Resolution Queue</h2>
-    <div id="resolution-list"><p class="empty-state">Waiting for resolution day or cluster finalization.</p></div>
+    <h2 class="panel-title">Day 5 Resolution Queue</h2>
+    <div id="resolution-list" class="corkboard-row"><p class="empty-state">Waiting for resolution day or cluster finalization.</p></div>
   </div>
 
   <!-- Leaderboard Panel -->
   <div class="teacher-panel" id="panel-leaderboard">
-    <h2>Leaderboard</h2>
-    <button id="refresh-leaderboard-btn" class="btn-ghost">Refresh</button>
-    <button id="reveal-leaderboard-btn" class="btn-primary" style="margin-left:8px">Reveal to Class</button>
-    <div id="teacher-leaderboard-body"></div>
+    <h2 class="panel-title">Leaderboard</h2>
+    <div class="leaderboard-actions">
+      <button id="refresh-leaderboard-btn" class="btn-ghost">Refresh</button>
+      <button id="reveal-leaderboard-btn" class="btn-primary" style="margin-left:8px">Reveal to Class</button>
+    </div>
+    <div id="teacher-leaderboard-body" class="leaderboard-notes-row"></div>
   </div>
 </main>
 
@@ -265,14 +395,13 @@
 
 <div id="toast-container" class="toast-container" aria-live="polite"></div>
 
-<button class="theme-btn" title="Switch theme">Dark</button>
-
-<script src="js/api.js"></script>
-<script src="js/ui.js"></script>
-<script src="js/theme.js"></script>
-<script src="js/auth.js"></script>
-<script src="js/student.js"></script>
-<script src="js/teacher.js"></script>
-<script src="js/app.js"></script>
+<script src="js/config.js" defer></script>
+<script src="js/api.js?v=2.0" defer></script>
+<script src="js/ui.js?v=2.0" defer></script>
+<script src="js/theme.js?v=2.0" defer></script>
+<script src="js/auth.js?v=2.0" defer></script>
+<script src="js/student.js?v=2.0" defer></script>
+<script src="js/teacher.js?v=2.0" defer></script>
+<script src="js/app.js?v=2.0" defer></script>
 </body>
 </html>

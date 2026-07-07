@@ -49,8 +49,8 @@ def compute_points(clusters: dict, doubts: list, week_start: str, room_code: str
     doubt_points = {}
 
     for cid, cluster in clusters.items():
-        size = cluster.get("size", 1)
-        points_per_doubt = BASE_PARTICIPATION + round(K_RARITY_BONUS / size, 1)
+        size = max(1, int(cluster.get("size", 1)))
+        points_per_doubt = max(0.0, BASE_PARTICIPATION + round(K_RARITY_BONUS / size, 1))
 
         for did in cluster.get("doubt_ids", []):
             doubt_points[did] = points_per_doubt

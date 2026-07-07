@@ -11,20 +11,27 @@ const DoubtNetAPI = (() => {
   const events = {};
   let reconnectTimer = null;
   let reconnectAttempt = 0;
+  let intentionalDisconnect = false;
+  let inRoom = false; // only auto-reconnect once user has entered a room
 
   function connect(serverUrl) {
     url = serverUrl;
+    intentionalDisconnect = false;
     if (ws) disconnect();
 
-    ws = new WebSocket(url);
+    const socket = new WebSocket(url);
+    ws = socket;
 
-    ws.onopen = () => {
+    socket.onopen = () => {
+      // Ignore events from stale WebSocket instances
+      if (ws !== socket) return;
       console.log('[DN] Connected');
       reconnectAttempt = 0;
       emit('open');
     };
 
-    ws.onmessage = (e) => {
+    socket.onmessage = (e) => {
+      if (ws !== socket) return;
       try {
         const data = JSON.parse(e.data);
         emit(data.type, data);
@@ -33,13 +40,23 @@ const DoubtNetAPI = (() => {
       }
     };
 
-    ws.onclose = () => {
-      console.log('[DN] Disconnected');
+    socket.onclose = (event) => {
+      // Ignore close events from old/stale WebSocket instances
+      if (ws !== socket) {
+        console.log('[DN] Stale WebSocket closed — ignoring');
+        return;
+      }
+      console.log(`[DN] Disconnected (code=${event.code}, reason=${event.reason || 'n/a'}, clean=${event.wasClean})`);
+      ws = null;
       emit('close');
-      scheduleReconnect();
+      // Only auto-reconnect if the disconnect was unexpected AND we were in a room
+      if (!intentionalDisconnect && inRoom) {
+        scheduleReconnect();
+      }
     };
 
-    ws.onerror = () => {
+    socket.onerror = () => {
+      if (ws !== socket) return;
       console.warn('[DN] WebSocket error');
     };
   }
@@ -56,6 +73,8 @@ const DoubtNetAPI = (() => {
   }
 
   function disconnect() {
+    intentionalDisconnect = true;
+    inRoom = false;
     if (reconnectTimer) {
       clearTimeout(reconnectTimer);
       reconnectTimer = null;
@@ -67,10 +86,16 @@ const DoubtNetAPI = (() => {
     }
   }
 
+  function setInRoom(value) {
+    inRoom = value;
+  }
+
   function send(data) {
     if (ws && ws.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify(data));
+      return true;
     }
+    return false;
   }
 
   function isOpen() {
@@ -84,12 +109,16 @@ const DoubtNetAPI = (() => {
 
   function off(type, callback) {
     if (!events[type]) return;
-    events[type] = events[type].filter(cb => cb !== callback);
+    if (!callback) {
+      delete events[type];
+    } else {
+      events[type] = events[type].filter(cb => cb !== callback);
+    }
   }
 
   function emit(type, data) {
     (events[type] || []).forEach(cb => cb(data));
   }
 
-  return { connect, disconnect, send, isOpen, on, off };
+  return { connect, disconnect, send, isOpen, on, off, setInRoom };
 })();

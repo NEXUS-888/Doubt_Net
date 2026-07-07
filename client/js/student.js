@@ -166,7 +166,7 @@ const Student = (() => {
     switch (phase) {
       case 'before_class':
         icon = '&#9203;';
-        text = subject ? `Waiting for ${subject} class...` : 'Waiting for class...';
+        text = subject ? `Waiting for ${subject} class` : 'Waiting for class';
         break;
       case 'class_active':
         icon = '&#128218;';
@@ -174,23 +174,25 @@ const Student = (() => {
         break;
       case 'doubt_window':
         icon = '&#9888;&#65039;';
-        if (state.allow_all_doubts || state.seconds_remaining === -1) {
-          text = 'Doubt window OPEN! (Manual Mode — doubts allowed by teacher)';
+        if (state.mode === 'webinar') {
+          text = `Doubt window open for ${subject}`;
+        } else if (state.allow_all_doubts || state.seconds_remaining === -1) {
+          text = 'Doubt window open';
         } else {
-          text = `Doubt window OPEN! Submit your questions (${UI.formatCountdown(secsRemaining)} remaining)`;
+          text = `Doubt window open, submit your query (${UI.formatCountdown(secsRemaining)} remaining)`;
         }
         break;
       case 'grace_period':
         icon = '&#9201;&#65039;';
-        text = `Grace period — ${UI.formatCountdown(secsRemaining)} to submit`;
+        text = `Grace period — ${UI.formatCountdown(secsRemaining)} remaining to submit`;
         break;
       case 'resolution_session':
         icon = '&#128269;&#65039;';
-        text = 'Resolution day — teacher is answering doubts';
+        text = 'Resolution session — teacher is answering doubts';
         break;
       case 'after_class':
         icon = '&#127881;';
-        text = 'Class is over. See you next time!';
+        text = 'Class is over';
         break;
       default:
         icon = '&#128197;';
@@ -226,14 +228,15 @@ const Student = (() => {
       }
       let remaining = secs;
       countdownEl.textContent = UI.formatCountdown(remaining);
+      const targetTime = Date.now() + remaining * 1000;
       countdownInterval = setInterval(() => {
-        remaining--;
-        if (remaining <= 0) {
+        const diff = Math.max(0, Math.round((targetTime - Date.now()) / 1000));
+        if (diff <= 0) {
           countdownEl.textContent = '0:00';
           clearInterval(countdownInterval);
           countdownInterval = null;
         } else {
-          countdownEl.textContent = UI.formatCountdown(remaining);
+          countdownEl.textContent = UI.formatCountdown(diff);
         }
       }, 1000);
     } else {
@@ -243,15 +246,21 @@ const Student = (() => {
 
   function setupAutosave() {
     let lastText = '';
-    setInterval(() => {
-      const text = doubtInput.value;
-      if (text && text !== lastText) {
-        lastText = text;
-        autosaveIndicator.textContent = 'Saving...';
-        autosaveIndicator.classList.add('saving');
-        DoubtNetAPI.send({ type: 'autosave_draft', text });
-      }
-    }, 3000);
+    let timeout = null;
+    doubtInput.addEventListener('input', () => {
+      autosaveIndicator.textContent = 'Typing...';
+      autosaveIndicator.classList.remove('saving');
+      if (timeout) clearTimeout(timeout);
+      timeout = setTimeout(() => {
+        const text = doubtInput.value;
+        if (text && text !== lastText) {
+          lastText = text;
+          autosaveIndicator.textContent = 'Saving...';
+          autosaveIndicator.classList.add('saving');
+          DoubtNetAPI.send({ type: 'autosave_draft', text });
+        }
+      }, 2000); // Save 2 seconds after user stops typing
+    });
   }
 
   function submitDoubt() {
@@ -262,7 +271,10 @@ const Student = (() => {
     }
     const urgencyEl = document.querySelector('.urgency-option.active input');
     const urgency = urgencyEl ? urgencyEl.value : 'clarification';
-    DoubtNetAPI.send({ type: 'submit_doubt', text, urgency });
+    const sent = DoubtNetAPI.send({ type: 'submit_doubt', text, urgency });
+    if (!sent) {
+      UI.toast('Connection offline. Doubt was not submitted.', 'error');
+    }
   }
 
   function requestMyDoubts() {
@@ -277,24 +289,59 @@ const Student = (() => {
     DoubtNetAPI.send({ type: 'get_leaderboard' });
   }
 
+  let lastDoubtAngle = 0;
+  function getDoubtAngle(state) {
+    let angle;
+    if (state === 'flagged') {
+      const sign = Math.random() < 0.5 ? -1 : 1;
+      angle = sign * (2.5 + Math.random() * 2.5);
+    } else if (state === 'approved') {
+      angle = -1 + Math.random() * 2;
+    } else {
+      const sign = Math.random() < 0.5 ? -1 : 1;
+      angle = sign * (1 + Math.random() * 2);
+    }
+    angle = parseFloat(angle.toFixed(1));
+    if (Math.abs(angle - lastDoubtAngle) < 0.5) {
+      angle += (Math.random() < 0.5 ? 0.8 : -0.8);
+    }
+    lastDoubtAngle = angle;
+    return angle;
+  }
+
   function renderMyDoubts(doubts) {
     myDoubtsList.innerHTML = '';
     if (!doubts || doubts.length === 0) {
-      myDoubtsList.innerHTML = '<p class="empty-state">No doubts submitted yet.</p>';
+      myDoubtsList.innerHTML = '<p class="empty-state">No doubts pinned yet — be the first.</p>';
       return;
     }
     doubts.forEach(d => {
-      const card = UI.el('div', 'doubt-card');
-      const text = UI.el('div', 'doubt-text', d.text);
-      const meta = UI.el('div', 'doubt-meta');
+      const isFlagged = d.status === 'flagged' || d.urgency === 'blocking';
+      const isApproved = d.status === 'approved' || d.status === 'resolved';
+      const state = isFlagged ? 'flagged' : (isApproved ? 'approved' : 'pending');
 
-      const urgency = UI.el('span', `doubt-urgency ${d.urgency}`, d.urgency === 'blocking' ? 'Blocking' : 'Clarification');
-      const day = UI.el('span', '', `Day ${d.day}`);
-      const status = UI.el('span', `doubt-status ${d.status}`, d.status);
+      const card = UI.el('div', `pinned-note ${state}`);
+      const angle = getDoubtAngle(state);
+      card.style.transform = `rotate(${angle}deg)`;
 
-      meta.appendChild(urgency);
-      meta.appendChild(day);
-      meta.appendChild(status);
+      const pin = UI.el('div', 'pushpin');
+      const text = UI.el('div', 'note-content-text', d.text);
+      const meta = UI.el('div', 'note-meta-row');
+
+      const urgencyText = d.urgency === 'feedback' ? 'Feedback' : (d.urgency === 'blocking' ? 'Blocking' : 'Clarification');
+      const metaLeft = UI.el('span', 'note-author', `Day ${d.day} — ${urgencyText}`);
+      
+      let statusDisplay = d.status;
+      if (d.status === 'pending') statusDisplay = 'awaiting review';
+      else if (d.status === 'approved') statusDisplay = 'approved';
+      else if (d.status === 'resolved') statusDisplay = 'resolved';
+      else if (d.status === 'flagged') statusDisplay = 'flagged';
+      
+      const metaRight = UI.el('span', '', statusDisplay);
+
+      meta.appendChild(metaLeft);
+      meta.appendChild(metaRight);
+      card.appendChild(pin);
       card.appendChild(text);
       card.appendChild(meta);
       myDoubtsList.appendChild(card);
@@ -305,17 +352,21 @@ const Student = (() => {
     if (!entries || entries.length === 0) return;
     lbPreview.classList.remove('hidden');
     studentLB.innerHTML = '';
-    entries.slice(0, 10).forEach((e, i) => {
-      const row = UI.el('div', 'lb-entry');
-      row.style.animationDelay = `${i * 0.05}s`;
-      const rank = UI.el('span', 'lb-rank', `#${e.rank}`);
+    entries.slice(0, 5).forEach((e, i) => {
+      const card = UI.el('div', `lb-note rank-${e.rank}`);
+      card.style.transform = `rotate(${(-2.5 + Math.random() * 5).toFixed(1)}deg)`;
+      
+      const pin = UI.el('div', 'pushpin');
+      const rank = UI.el('div', 'lb-note-rank', `#${e.rank}`);
       const name = e.real_name && e.show_real_name ? `${e.handle} (${e.real_name})` : e.handle;
-      const handle = UI.el('span', 'lb-handle', name);
-      const pts = UI.el('span', 'lb-points', `${e.total_points} pts`);
-      row.appendChild(rank);
-      row.appendChild(handle);
-      row.appendChild(pts);
-      studentLB.appendChild(row);
+      const handle = UI.el('div', 'lb-note-handle', name);
+      const pts = UI.el('div', 'lb-note-points', `${e.total_points} pts`);
+      
+      card.appendChild(pin);
+      card.appendChild(rank);
+      card.appendChild(handle);
+      card.appendChild(pts);
+      studentLB.appendChild(card);
     });
   }
 

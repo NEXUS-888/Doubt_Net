@@ -9,6 +9,7 @@ import json
 import os
 import re
 import threading
+from typing import Optional
 
 BANNED_WORDS_FILE = os.path.join(os.path.dirname(__file__), "data", "banned_words.json")
 _lock = threading.Lock()
@@ -37,21 +38,23 @@ MAX_CONSECUTIVE_UPPER = 8
 MAX_REPEAT_CHAR = 8
 
 
-def _check_profanity(text: str, banned_words: list) -> str | None:
+def _check_profanity(text: str, banned_words: list) -> Optional[str]:
     lower = text.lower()
     for word in banned_words:
+        # Match standard word
         if re.search(r'\b' + re.escape(word) + r'\b', lower):
             return f"profanity: '{word}'"
-    
-    # Check for obfuscated versions by removing punctuation, spaces, and hyphens
-    normalized = re.sub(r'[\s\.\-_*]', '', lower)
-    for word in banned_words:
-        if len(word) > 2 and word in normalized:
-            return f"profanity: '{word}'"
+        
+        # Match obfuscated word with separators like spaces, hyphens, asterisks, dots
+        # e.g., f-u-c-k, f*u*c*k, f u c k
+        if len(word) > 2:
+            pattern = r'\b' + r'[\s\.\-_*]?'.join(re.escape(c) for c in word) + r'\b'
+            if re.search(pattern, lower):
+                return f"profanity: '{word}'"
     return None
 
 
-def _check_spam_heuristics(text: str) -> str | None:
+def _check_spam_heuristics(text: str) -> Optional[str]:
     if len(text) < MIN_DOUBT_LENGTH:
         return "too_short"
 
@@ -67,7 +70,7 @@ def _check_spam_heuristics(text: str) -> str | None:
     return None
 
 
-def _check_duplicate(text: str, username: str, existing_doubts: list) -> str | None:
+def _check_duplicate(text: str, username: str, existing_doubts: list) -> Optional[str]:
     for doubt in existing_doubts:
         if doubt.get("username") == username and doubt.get("text") == text:
             return "duplicate"
@@ -77,7 +80,7 @@ def _check_duplicate(text: str, username: str, existing_doubts: list) -> str | N
 def check_doubt(text: str, username: str, existing_doubts: list = None) -> dict:
     """
     Run all moderation checks on a doubt.
-    Returns: { "flagged": bool, "flag": str | None }
+    Returns: { "flagged": bool, "flag": Optional[str] }
     """
     banned_words = _load_banned()
 

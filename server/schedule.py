@@ -8,6 +8,13 @@ import json
 import os
 import threading
 from datetime import datetime, date, timedelta
+from typing import Optional
+
+try:
+    from zoneinfo import ZoneInfo
+except ImportError:
+    # Python < 3.9 fallback
+    ZoneInfo = None
 
 _lock = threading.Lock()
 _DEMO_MODES = {}
@@ -40,9 +47,15 @@ def _save(data: dict, room_code: str):
 
 
 def set_allow_all_doubts(enabled: bool, room_code: str):
+    import time
     with _lock:
         schedule = _load(room_code)
         schedule["allow_all_doubts"] = enabled
+        if enabled:
+            # Auto-expire after 4 hours (14400 seconds)
+            schedule["allow_all_doubts_expires"] = time.time() + 14400
+        else:
+            schedule["allow_all_doubts_expires"] = 0
         _save(schedule, room_code)
 
 
@@ -57,17 +70,49 @@ def get_demo_mode(room_code: str) -> bool:
 
 def set_schedule(schedule_data: dict, room_code: str) -> tuple:
     """Store a new schedule. Returns (success, message)."""
+    mode = schedule_data.get("mode", "class")
+    if mode == "webinar":
+        if "subject" not in schedule_data:
+            return False, "Missing required field: subject"
+        with _lock:
+            existing = _load(room_code)
+            webinar_schedule = dict(existing)
+            webinar_schedule.update(schedule_data)
+            webinar_schedule["mode"] = "webinar"
+            webinar_schedule["subject"] = schedule_data.get("subject", existing.get("subject", "Webinar Session"))
+            webinar_schedule["webinar_active"] = bool(schedule_data.get("webinar_active", False))
+            webinar_schedule["week_start"] = existing.get("week_start") or webinar_schedule.get("week_start") or f"webinar_{int(datetime.now().timestamp())}"
+            _save(webinar_schedule, room_code)
+        return True, "Webinar session configuration saved."
+
     required = ["week_start", "subject", "days"]
     for key in required:
         if key not in schedule_data:
             return False, f"Missing required field: {key}"
     if not isinstance(schedule_data["days"], list) or len(schedule_data["days"]) < 1:
         return False, "Schedule must have at least one day."
+
+    import re
     for day in schedule_data["days"]:
         for field in ["day", "date", "start", "end"]:
             if field not in day:
                 return False, f"Day entry missing field: {field}"
+        # Validate day range (1 to 5)
+        if not (1 <= day.get("day", 0) <= 5):
+            return False, "Day number must be between 1 and 5."
+        # Validate YYYY-MM-DD
+        if not re.match(r'^\d{4}-\d{2}-\d{2}$', str(day.get("date", ""))):
+            return False, "Invalid date format. Use YYYY-MM-DD."
+        # Validate HH:MM
+        if not re.match(r'^\d{2}:\d{2}$', str(day.get("start", ""))):
+            return False, "Invalid start time format. Use HH:MM."
+        if not re.match(r'^\d{2}:\d{2}$', str(day.get("end", ""))):
+            return False, "Invalid end time format. Use HH:MM."
+        if day["start"] >= day["end"]:
+            return False, f"Start time ({day['start']}) must be before end time ({day['end']})."
+
     with _lock:
+        schedule_data["mode"] = "class"
         schedule_data["doubt_window_minutes"] = schedule_data.get("doubt_window_minutes", 5)
         schedule_data["grace_period_seconds"] = schedule_data.get("grace_period_seconds", 90)
         _save(schedule_data, room_code)
@@ -87,7 +132,7 @@ def _parse_time(date_str: str, time_str: str) -> datetime:
     return datetime.strptime(dt_str, "%Y-%m-%d %H:%M")
 
 
-def set_pinned_doubt(doubt_id: str | None, room_code: str):
+def set_pinned_doubt(doubt_id: Optional[str], room_code: str):
     with _lock:
         schedule = _load(room_code)
         schedule["pinned_doubt_id"] = doubt_id
@@ -126,15 +171,55 @@ def _get_current_state_raw(room_code: str) -> dict:
 
     # Check if manual doubts mode is toggled on
     if schedule.get("allow_all_doubts", False):
-        return {
-            "phase": "doubt_window",
-            "day": 1,
-            "seconds_remaining": -1,
-            "subject": schedule.get("subject", "Manual Doubt Session"),
-            "allow_all_doubts": True
-        }
+        import time
+        expires = schedule.get("allow_all_doubts_expires", 0)
+        if expires and time.time() > expires:
+            with _lock:
+                schedule = _load(room_code)
+                schedule["allow_all_doubts"] = False
+                schedule["allow_all_doubts_expires"] = 0
+                _save(schedule, room_code)
+        else:
+            return {
+                "phase": "doubt_window",
+                "day": 1,
+                "seconds_remaining": -1,
+                "subject": schedule.get("subject", "Manual Doubt Session"),
+                "allow_all_doubts": True
+            }
 
-    now = datetime.now()
+    # Handle Webinar Mode
+    if schedule.get("mode") == "webinar":
+        subject = schedule.get("subject", "Webinar Session")
+        active = schedule.get("webinar_active", False)
+        if active:
+            return {
+                "phase": "doubt_window",
+                "day": 1,
+                "seconds_remaining": -1,
+                "subject": subject,
+                "mode": "webinar",
+                "webinar_active": True
+            }
+        else:
+            return {
+                "phase": "no_class_today",
+                "day": 1,
+                "seconds_remaining": 0,
+                "subject": subject,
+                "mode": "webinar",
+                "webinar_active": False
+            }
+
+    # Use room timezone if configured, otherwise server-local time
+    tz = None
+    room_tz = schedule.get("timezone")
+    if room_tz and ZoneInfo is not None:
+        try:
+            tz = ZoneInfo(room_tz)
+        except (KeyError, Exception):
+            pass  # Invalid timezone — fall back to server-local
+    now = datetime.now(tz=tz)
     today_str = now.strftime("%Y-%m-%d")
 
     # Find today's class

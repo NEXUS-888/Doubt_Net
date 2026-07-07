@@ -13,10 +13,13 @@ const UI = (() => {
 
   function toast(message, type = 'info', duration = 3200) {
     const container = document.getElementById('toast-container');
+    if (container && container.children.length >= 5) {
+      container.children[0].remove();
+    }
     const el = document.createElement('div');
     el.className = `toast ${type}`;
     el.textContent = message;
-    container.appendChild(el);
+    if (container) container.appendChild(el);
     setTimeout(() => {
       el.classList.add('leaving');
       setTimeout(() => el.remove(), 250);

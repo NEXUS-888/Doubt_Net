@@ -17,14 +17,39 @@ def encode(obj: dict) -> str:
     return json.dumps(obj)
 
 
+REQUIRED_FIELDS = {
+    "register": ["username", "password", "role"],
+    "login": ["username", "password"],
+    "select_room": ["room_code"],
+    "create_room": ["room_name"],
+    "join_room": ["room_code"],
+    "submit_doubt": ["text", "urgency"],
+    "autosave_draft": ["text"],
+    "pin_doubt": [],
+    "moderate_doubt": ["doubt_id", "action"],
+    "set_schedule": ["schedule"],
+    "resolve_doubt": ["cluster_id"],
+    "merge_clusters": ["cluster_a", "cluster_b"],
+    "split_cluster": ["cluster_id", "doubt_ids"],
+}
+
+
 def decode(raw: str) -> dict:
     obj = json.loads(raw)
     if not isinstance(obj, dict) or "type" not in obj:
         raise ValueError("Message must be a JSON object with a 'type' field")
+    msg_type = obj["type"]
+    if msg_type in REQUIRED_FIELDS:
+        for field in REQUIRED_FIELDS[msg_type]:
+            if field not in obj:
+                raise ValueError(f"Message of type '{msg_type}' missing required field: '{field}'")
     return obj
 
 
 # ---- Server -> Client message builders ----
+
+PROTOCOL_VERSION = "v1.2"
+
 
 def msg_auth_ok(username: str, role: str, state: dict, room_code: str = None, room_name: str = None) -> str:
     return encode({
@@ -34,6 +59,7 @@ def msg_auth_ok(username: str, role: str, state: dict, room_code: str = None, ro
         "state": state,
         "room_code": room_code,
         "room_name": room_name,
+        "protocol_version": PROTOCOL_VERSION,
     })
 
 
@@ -42,6 +68,29 @@ def msg_needs_room(role: str) -> str:
     return encode({
         "type": "needs_room",
         "role": role,
+    })
+
+
+def msg_rooms_list(username: str, role: str, rooms: list) -> str:
+    """Sent after login/register with user's room list for the room picker."""
+    return encode({
+        "type": "rooms_list",
+        "username": username,
+        "role": role,
+        "rooms": rooms,
+    })
+
+
+def msg_room_entered(username: str, role: str, state: dict, room_code: str, room_name: str) -> str:
+    """Sent when a user selects a room from the picker."""
+    return encode({
+        "type": "room_entered",
+        "username": username,
+        "role": role,
+        "state": state,
+        "room_code": room_code,
+        "room_name": room_name,
+        "protocol_version": PROTOCOL_VERSION,
     })
 
 
@@ -77,8 +126,11 @@ def msg_all_doubts(approved: list, flagged: list) -> str:
     return encode({"type": "all_doubts", "approved": approved, "flagged": flagged})
 
 
-def msg_clusters(data: dict) -> str:
-    return encode({"type": "clusters", "clusters": data})
+def msg_clusters(data: dict, warning: str = None) -> str:
+    res = {"type": "clusters", "clusters": data}
+    if warning:
+        res["warning"] = warning
+    return encode(res)
 
 
 def msg_cluster_updated(clusters: dict) -> str:

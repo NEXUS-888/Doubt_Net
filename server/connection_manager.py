@@ -6,11 +6,12 @@ role-aware and room-aware broadcasting and direct messaging.
 """
 
 import asyncio
+from typing import Optional
 
 
 class ConnectionManager:
     def __init__(self):
-        # websocket -> {"username": str, "role": str, "room_code": str | None}
+        # websocket -> {"username": str, "role": str, "room_code": Optional[str]}
         self._clients: dict = {}
         self._lock = asyncio.Lock()
 
@@ -22,12 +23,12 @@ class ConnectionManager:
         async with self._lock:
             self._clients.pop(websocket, None)
 
-    async def get_username(self, websocket) -> str | None:
+    async def get_username(self, websocket) -> Optional[str]:
         async with self._lock:
             info = self._clients.get(websocket)
             return info["username"] if info else None
 
-    async def get_role(self, websocket) -> str | None:
+    async def get_role(self, websocket) -> Optional[str]:
         async with self._lock:
             info = self._clients.get(websocket)
             return info["role"] if info else None
@@ -60,73 +61,71 @@ class ConnectionManager:
                 pass
             await self.remove(target_ws)
 
+    async def _send_safe(self, ws, message: str):
+        """Helper to send message to a client and return the websocket on error."""
+        try:
+            await ws.send(message)
+            return None
+        except Exception:
+            return ws
+
     async def broadcast(self, message: str, exclude=None):
-        """Broadcast to ALL connected clients."""
+        """Broadcast to ALL connected clients concurrently."""
         async with self._lock:
             targets = [ws for ws in self._clients.keys() if ws is not exclude]
+        if not targets:
+            return
 
-        dead = []
-        for ws in targets:
-            try:
-                await ws.send(message)
-            except Exception:
-                dead.append(ws)
-
-        for ws in dead:
+        results = await asyncio.gather(*(self._send_safe(ws, message) for ws in targets), return_exceptions=True)
+        dead = [ws for ws in results if isinstance(ws, websocket.__class__ if hasattr(websocket, "__class__") else object) or ws is not None]
+        # In case exception objects or websockets are returned, filter for actual websockets
+        dead_ws = [ws for ws in dead if ws in targets]
+        for ws in dead_ws:
             await self.remove(ws)
 
     async def broadcast_to_room(self, room_code: str, message: str, exclude=None):
-        """Broadcast to all clients in a specific room."""
+        """Broadcast to all clients in a specific room concurrently."""
         async with self._lock:
             targets = [
                 ws for ws, info in self._clients.items()
                 if info.get("room_code") == room_code and ws is not exclude
             ]
+        if not targets:
+            return
 
-        dead = []
-        for ws in targets:
-            try:
-                await ws.send(message)
-            except Exception:
-                dead.append(ws)
-
-        for ws in dead:
+        results = await asyncio.gather(*(self._send_safe(ws, message) for ws in targets), return_exceptions=True)
+        dead_ws = [ws for ws in results if ws in targets]
+        for ws in dead_ws:
             await self.remove(ws)
 
     async def broadcast_to_role(self, message: str, role: str, exclude=None):
-        """Send message to all connected clients of a given role."""
+        """Send message to all connected clients of a given role concurrently."""
         async with self._lock:
             targets = [
                 ws for ws, info in self._clients.items()
                 if info["role"] == role and ws is not exclude
             ]
+        if not targets:
+            return
 
-        dead = []
-        for ws in targets:
-            try:
-                await ws.send(message)
-            except Exception:
-                dead.append(ws)
-
-        for ws in dead:
+        results = await asyncio.gather(*(self._send_safe(ws, message) for ws in targets), return_exceptions=True)
+        dead_ws = [ws for ws in results if ws in targets]
+        for ws in dead_ws:
             await self.remove(ws)
 
     async def broadcast_to_role_in_room(self, room_code: str, role: str, message: str, exclude=None):
-        """Send message to all clients of a given role in a specific room."""
+        """Send message to all clients of a given role in a specific room concurrently."""
         async with self._lock:
             targets = [
                 ws for ws, info in self._clients.items()
                 if info["role"] == role and info.get("room_code") == room_code and ws is not exclude
             ]
+        if not targets:
+            return
 
-        dead = []
-        for ws in targets:
-            try:
-                await ws.send(message)
-            except Exception:
-                dead.append(ws)
-
-        for ws in dead:
+        results = await asyncio.gather(*(self._send_safe(ws, message) for ws in targets), return_exceptions=True)
+        dead_ws = [ws for ws in results if ws in targets]
+        for ws in dead_ws:
             await self.remove(ws)
 
     async def send_to_user(self, username: str, message: str):

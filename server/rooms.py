@@ -11,6 +11,7 @@ import random
 import string
 import threading
 import time
+from typing import Optional
 
 ROOMS_FILE = os.path.join(os.path.dirname(__file__), "data", "rooms.json")
 _lock = threading.RLock()
@@ -43,10 +44,13 @@ def _generate_code() -> str:
             return code
 
 
-def create_room(teacher_username: str, room_name: str) -> dict:
+def create_room(teacher_username: str, room_name: str, room_code: str = None) -> dict:
     """Create a new room for a teacher. Returns the room dict."""
     with _lock:
-        code = _generate_code()
+        rooms = _load()
+        code = room_code.upper().strip() if room_code else None
+        if not code or code in rooms:
+            code = _generate_code()
         room = {
             "code": code,
             "name": room_name,
@@ -54,7 +58,6 @@ def create_room(teacher_username: str, room_name: str) -> dict:
             "created_at": time.time(),
             "students": []
         }
-        rooms = _load()
         rooms[code] = room
         _save(rooms)
 
@@ -94,14 +97,14 @@ def leave_room(student_username: str, room_code: str) -> bool:
         return False
 
 
-def get_room(room_code: str) -> dict | None:
+def get_room(room_code: str) -> Optional[dict]:
     """Get room info by code."""
     with _lock:
         rooms = _load()
         return rooms.get(room_code.upper())
 
 
-def get_room_for_user(username: str, role: str) -> dict | None:
+def get_room_for_user(username: str, role: str) -> Optional[dict]:
     """Find which room a user belongs to."""
     with _lock:
         rooms = _load()
@@ -124,6 +127,23 @@ def get_room_members(room_code: str) -> list:
         for s in room.get("students", []):
             members.append({"username": s, "role": "student"})
         return members
+
+
+def get_rooms_by_codes(codes: list) -> list:
+    """Get room summaries for a list of codes. Returns list of dicts."""
+    with _lock:
+        rooms = _load()
+        result = []
+        for code in codes:
+            room = rooms.get(code.upper())
+            if room:
+                result.append({
+                    "code": room["code"],
+                    "name": room["name"],
+                    "teacher": room["teacher"],
+                    "student_count": len(room.get("students", [])),
+                })
+        return result
 
 
 def room_data_dir(room_code: str) -> str:

@@ -11,6 +11,8 @@ const Teacher = (() => {
   let latestLeaderboard = [];
   let latestApprovedDoubts = [];
   let latestClusters = {};
+  let currentMode = 'class';
+  let currentWebinarActive = false;
 
   const meLabel = document.getElementById('teacher-me-label');
   const logoutBtn = document.getElementById('teacher-logout-btn');
@@ -80,6 +82,49 @@ const Teacher = (() => {
     const allowAllDoubtsBtn = document.getElementById('allow-all-doubts-btn');
     let allowAllDoubtsEnabled = false;
 
+    // Mode Selector tabs listeners
+    const modeClassBtn = document.getElementById('mode-class-btn');
+    const modeWebinarBtn = document.getElementById('mode-webinar-btn');
+    const classFields = document.getElementById('class-mode-fields');
+    const webinarFields = document.getElementById('webinar-mode-fields');
+
+    if (modeClassBtn && modeWebinarBtn) {
+      modeClassBtn.addEventListener('click', () => {
+        currentMode = 'class';
+        modeClassBtn.classList.add('active');
+        modeWebinarBtn.classList.remove('active');
+        classFields.classList.remove('hidden');
+        webinarFields.classList.add('hidden');
+      });
+
+      modeWebinarBtn.addEventListener('click', () => {
+        currentMode = 'webinar';
+        modeWebinarBtn.classList.add('active');
+        modeClassBtn.classList.remove('active');
+        webinarFields.classList.remove('hidden');
+        classFields.classList.add('hidden');
+      });
+    }
+
+    const toggleWebinarBtn = document.getElementById('toggle-webinar-btn');
+    if (toggleWebinarBtn) {
+      toggleWebinarBtn.addEventListener('click', () => {
+        const nextActive = !currentWebinarActive;
+        const subject = schedSubject.value.trim() || 'Webinar Session';
+        
+        DoubtNetAPI.send({
+          type: 'set_schedule',
+          schedule: {
+            mode: 'webinar',
+            webinar_active: nextActive,
+            subject: subject
+          }
+        });
+        
+        UI.toast(nextActive ? 'Webinar session started!' : 'Webinar session stopped.', 'success');
+      });
+    }
+
     saveScheduleBtn.addEventListener('click', saveSchedule);
     demoModeBtn.addEventListener('click', toggleDemo);
     
@@ -145,6 +190,13 @@ const Teacher = (() => {
       }
     });
 
+    DoubtNetAPI.on('presence', (data) => {
+      const statsOnline = document.getElementById('stats-online-count');
+      if (statsOnline && data.users) {
+        statsOnline.textContent = data.users.length;
+      }
+    });
+
     let lastFlaggedCount = 0;
     DoubtNetAPI.on('all_doubts', (data) => {
       const flagged = data.flagged || [];
@@ -156,9 +208,25 @@ const Teacher = (() => {
       lastFlaggedCount = flagged.length;
       renderModeration(flagged);
       renderApproved(latestApprovedDoubts);
+
+      // Update Session Stats Card
+      const doubtsOnly = [...latestApprovedDoubts, ...flagged].filter(d => d.urgency !== 'feedback');
+      const feedbackOnly = [...latestApprovedDoubts, ...flagged].filter(d => d.urgency === 'feedback');
+      const resolved = latestApprovedDoubts.filter(d => d.status === 'resolved');
+
+      const statsDoubts = document.getElementById('stats-doubts-count');
+      const statsFeedback = document.getElementById('stats-feedback-count');
+      const statsResolved = document.getElementById('stats-resolved-count');
+
+      if (statsDoubts) statsDoubts.textContent = doubtsOnly.length;
+      if (statsFeedback) statsFeedback.textContent = feedbackOnly.length;
+      if (statsResolved) statsResolved.textContent = resolved.length;
     });
 
     DoubtNetAPI.on('clusters', (data) => {
+      if (data.warning) {
+        UI.toast(data.warning, 'info', 6000);
+      }
       latestClusters = data.clusters || {};
       renderClusters(latestClusters);
     });
@@ -199,6 +267,17 @@ const Teacher = (() => {
   }
 
   function saveSchedule() {
+    if (currentMode === 'webinar') {
+      const schedule = {
+        mode: 'webinar',
+        webinar_active: currentWebinarActive,
+        subject: schedSubject.value.trim() || 'Webinar Session',
+      };
+      DoubtNetAPI.send({ type: 'set_schedule', schedule });
+      UI.toast('Webinar configuration saved!', 'success');
+      return;
+    }
+
     const days = [];
     document.querySelectorAll('.schedule-day-row').forEach(row => {
       const dayNum = parseInt(row.dataset.day);
@@ -233,6 +312,48 @@ const Teacher = (() => {
     schedSubject.value = schedule.subject || '';
     scheduleDays.innerHTML = '';
 
+    currentMode = schedule.mode || 'class';
+    currentWebinarActive = schedule.webinar_active || false;
+
+    // Update active mode tab trigger UI
+    const modeClassBtn = document.getElementById('mode-class-btn');
+    const modeWebinarBtn = document.getElementById('mode-webinar-btn');
+    const classFields = document.getElementById('class-mode-fields');
+    const webinarFields = document.getElementById('webinar-mode-fields');
+
+    if (modeClassBtn && modeWebinarBtn) {
+      if (currentMode === 'webinar') {
+        modeWebinarBtn.classList.add('active');
+        modeClassBtn.classList.remove('active');
+        webinarFields.classList.remove('hidden');
+        classFields.classList.add('hidden');
+      } else {
+        modeClassBtn.classList.add('active');
+        modeWebinarBtn.classList.remove('active');
+        classFields.classList.remove('hidden');
+        webinarFields.classList.add('hidden');
+      }
+    }
+
+    const toggleWebinarBtn = document.getElementById('toggle-webinar-btn');
+    const webinarStatusText = document.getElementById('webinar-status-text');
+
+    if (toggleWebinarBtn && webinarStatusText) {
+      if (currentWebinarActive) {
+        toggleWebinarBtn.textContent = 'Stop Webinar Session';
+        toggleWebinarBtn.style.background = 'var(--pin-flagged)';
+        toggleWebinarBtn.style.borderColor = 'var(--pin-flagged)';
+        webinarStatusText.textContent = 'Session is currently open & accepting doubts/feedback.';
+        webinarStatusText.style.color = 'var(--pin-approved)';
+      } else {
+        toggleWebinarBtn.textContent = 'Start Webinar Session';
+        toggleWebinarBtn.style.background = 'var(--pin-approved)';
+        toggleWebinarBtn.style.borderColor = 'var(--pin-approved)';
+        webinarStatusText.textContent = 'Session is currently closed.';
+        webinarStatusText.style.color = 'var(--paper-ink)';
+      }
+    }
+
     const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
     for (let i = 1; i <= 5; i++) {
       const existing = (schedule.days || []).find(d => d.day === i);
@@ -241,10 +362,10 @@ const Teacher = (() => {
       row.dataset.day = i;
       row.innerHTML = `
         <label>${dayNames[i - 1]}</label>
-        <input type="date" class="sched-date" value="${existing ? existing.date : ''}">
-        <input type="time" class="sched-start" value="${existing ? existing.start : '09:00'}">
+        <input type="date" class="sched-date" value="${UI.escapeHtml(existing ? existing.date : '')}">
+        <input type="time" class="sched-start" value="${UI.escapeHtml(existing ? existing.start : '09:00')}">
         <span style="color:var(--static-gray);font-size:11px">to</span>
-        <input type="time" class="sched-end" value="${existing ? existing.end : '10:00'}">
+        <input type="time" class="sched-end" value="${UI.escapeHtml(existing ? existing.end : '10:00')}">
         ${i === 5 ? '<span style="font-size:10px;color:var(--dn-amber)">Resolution day</span>' : ''}
       `;
       scheduleDays.appendChild(row);
@@ -270,21 +391,25 @@ const Teacher = (() => {
   function renderModeration(flagged) {
     modList.innerHTML = '';
     if (!flagged || flagged.length === 0) {
-      modList.innerHTML = '<p class="empty-state">No flagged doubts.</p>';
+      modList.innerHTML = '<p class="empty-state">No doubts pinned yet — be the first.</p>';
       return;
     }
     flagged.forEach(d => {
       const item = document.createElement('div');
-      item.className = 'moderation-item';
+      item.className = 'pinned-note flagged';
+      item.style.transform = `rotate(${(-5 + Math.random() * 10).toFixed(1)}deg)`;
       item.innerHTML = `
-        <div class="mod-text">
-          ${UI.escapeHtml(d.text)}
-          <div class="mod-meta">@${UI.escapeHtml(d.username)} — Day ${d.day} — ${UI.escapeHtml(d.moderation?.auto_flag || 'flagged')}</div>
-          <div class="mod-flag">${UI.escapeHtml(d.moderation?.auto_flag || 'unknown')}</div>
+        <div class="pushpin"></div>
+        <div class="note-content-text">${UI.escapeHtml(d.text)}</div>
+        <div class="note-meta-row">
+          <span class="note-author">@${UI.escapeHtml(d.username)} — Day ${d.day}</span>
         </div>
-        <div class="mod-actions">
-          <button class="btn-ghost mod-approve" data-id="${d.id}" style="border-color:var(--success-green);color:var(--success-green)">Approve</button>
-          <button class="btn-ghost mod-reject" data-id="${d.id}" style="border-color:var(--error-red);color:var(--error-red)">Reject</button>
+        <div class="note-meta-row" style="margin-top: 6px; border: none; padding: 0;">
+          <span style="font-size:10px; color:var(--pin-flagged); font-weight: 600;">${UI.escapeHtml(d.moderation?.auto_flag || 'flagged')}</span>
+        </div>
+        <div class="note-action-tabs" style="display:flex; gap: 8px; margin-top: 12px; border-top: 1px dotted rgba(58,47,31,0.2); padding-top: 8px;">
+          <button class="paper-tab mod-approve" style="font-size:11px; padding: 4px 8px; background: rgba(74, 124, 98, 0.1); border-color: rgba(74, 124, 98, 0.3); color: var(--pin-approved); flex: 1;" data-id="${d.id}">Approve</button>
+          <button class="paper-tab mod-reject" style="font-size:11px; padding: 4px 8px; background: rgba(184, 68, 60, 0.1); border-color: rgba(184, 68, 60, 0.3); color: var(--pin-flagged); flex: 1;" data-id="${d.id}">Reject</button>
         </div>
       `;
       item.querySelector('.mod-approve').addEventListener('click', () => {
@@ -305,37 +430,49 @@ const Teacher = (() => {
     const list = document.getElementById('live-approved-list');
     list.innerHTML = '';
     if (!approved || approved.length === 0) {
-      list.innerHTML = '<p class="empty-state">No approved doubts yet.</p>';
+      list.innerHTML = '<p class="empty-state">No doubts pinned yet — be the first.</p>';
       return;
     }
-    // Reverse to show newest first
+
+    // Populate scattered background decor notes to fill empty space
+    const decorBoard = document.getElementById('scattered-decor-board');
+    if (decorBoard) {
+      decorBoard.innerHTML = '';
+      approved.slice(0, 3).forEach((d, idx) => {
+        const card = document.createElement('div');
+        card.className = 'pinned-note approved';
+        card.style.transform = `rotate(${(-3 + Math.random() * 6).toFixed(1)}deg)`;
+        card.style.opacity = '0.55';
+        card.innerHTML = `
+          <div class="pushpin"></div>
+          <div class="note-content-text">${UI.escapeHtml(d.text)}</div>
+          <div class="note-meta-row">
+            <span class="note-author">Day ${d.day} — resolved</span>
+          </div>
+        `;
+        decorBoard.appendChild(card);
+      });
+    }
+
     [...approved].reverse().forEach(d => {
       const item = document.createElement('div');
-      item.className = 'moderation-item'; 
-      
-      const modText = document.createElement('div');
-      modText.className = 'mod-text';
-      modText.innerHTML = `
-        ${UI.escapeHtml(d.text)}
-        <div class="mod-meta">@${UI.escapeHtml(d.username)} — Day ${d.day} — Priority: ${UI.escapeHtml(d.urgency)}</div>
-        <div class="mod-flag" style="background:var(--dn-emerald-dim);color:var(--dn-emerald);display:inline-block;">Approved</div>
+      item.className = 'pinned-note approved';
+      item.style.transform = `rotate(${(-1.5 + Math.random() * 3).toFixed(1)}deg)`;
+      item.innerHTML = `
+        <div class="pushpin"></div>
+        <div class="note-content-text">${UI.escapeHtml(d.text)}</div>
+        <div class="note-meta-row">
+          <span class="note-author">@${UI.escapeHtml(d.username)} — Day ${d.day}</span>
+          <span style="color:var(--pin-approved); font-weight:bold;">${UI.escapeHtml(d.urgency)}</span>
+        </div>
+        <div style="margin-top: 12px; border-top: 1px dotted rgba(58,47,31,0.2); padding-top: 8px; display: flex; justify-content: flex-end;">
+          <button class="paper-tab pin-btn" style="font-size:11px; padding: 4px 8px; width: 100%;" data-id="${d.id}">Pin to Board</button>
+        </div>
       `;
-      
-      const actions = document.createElement('div');
-      actions.className = 'mod-actions';
-      
-      const pinBtn = document.createElement('button');
-      pinBtn.className = 'btn-ghost';
-      pinBtn.textContent = 'Pin to Board';
-      pinBtn.style.cssText = 'border-color:var(--dn-amber);color:var(--dn-amber);font-size:11px;padding:4px 8px;';
-      pinBtn.addEventListener('click', () => {
+      item.querySelector('.pin-btn').addEventListener('click', () => {
         DoubtNetAPI.send({ type: 'pin_doubt', id: d.id });
         UI.toast('Doubt pinned to board!', 'success');
       });
-      
-      actions.appendChild(pinBtn);
-      item.appendChild(modText);
-      item.appendChild(actions);
       list.appendChild(item);
     });
   }
@@ -344,64 +481,42 @@ const Teacher = (() => {
     clusterList.innerHTML = '';
     const keys = Object.keys(clusters);
     if (keys.length === 0) {
-      clusterList.innerHTML = '<p class="empty-state">No clusters yet. Run auto-cluster after approving doubts.</p>';
+      clusterList.innerHTML = '<p class="empty-state">No doubts pinned yet — be the first.</p>';
       return;
     }
     keys.forEach((cid, idx) => {
       const c = clusters[cid];
       const card = document.createElement('div');
-      card.className = 'cluster-card';
-      card.style.animationDelay = `${idx * 0.05}s`;
-
-      const header = document.createElement('div');
-      header.className = 'cluster-header';
-      header.innerHTML = `
-        <span class="cluster-id">${cid}</span>
-        <span class="cluster-size">${c.size} doubt${c.size !== 1 ? 's' : ''}</span>
+      card.className = 'pinned-note pending';
+      card.style.transform = `rotate(${(-2.5 + Math.random() * 5).toFixed(1)}deg)`;
+      card.innerHTML = `
+        <div class="pushpin"></div>
+        <div class="note-content-text">${UI.escapeHtml(c.representative_text || '(no text)')}</div>
+        <div class="note-meta-row">
+          <span class="note-author">Cluster ${UI.escapeHtml(cid)}</span>
+          <span style="font-weight:bold; color:var(--pin-pending);">${c.size} doubts</span>
+        </div>
+        <div style="margin-top: 8px; border-top: 1px dotted rgba(58,47,31,0.2); padding-top: 6px; font-size:10px; color:var(--chalk-muted); margin-bottom: 8px; word-break: break-all;">
+          IDs: ${c.doubt_ids.join(', ')}
+        </div>
+        <div class="note-action-tabs" style="display:flex; gap: 8px;">
+          <button class="paper-tab merge-btn" style="font-size:10px; padding: 4px 8px; flex: 1;">Merge...</button>
+          <button class="paper-tab split-btn" style="font-size:10px; padding: 4px 8px; flex: 1;">Split</button>
+        </div>
       `;
-
-      const rep = document.createElement('div');
-      rep.className = 'cluster-rep';
-      rep.textContent = c.representative_text || '(no text)';
-
-      const actions = document.createElement('div');
-      actions.className = 'cluster-actions-row';
-
-      const mergeBtn = document.createElement('button');
-      mergeBtn.className = 'btn-ghost';
-      mergeBtn.textContent = 'Merge into...';
-      mergeBtn.style.cssText = 'font-size:10px;padding:4px 8px';
-      mergeBtn.addEventListener('click', () => {
+      card.querySelector('.merge-btn').addEventListener('click', () => {
         const target = prompt('Enter cluster ID to merge into this one:');
         if (target && target !== cid) {
           DoubtNetAPI.send({ type: 'merge_clusters', cluster_a: cid, cluster_b: target });
         }
       });
-
-      const splitBtn = document.createElement('button');
-      splitBtn.className = 'btn-ghost';
-      splitBtn.textContent = 'Split';
-      splitBtn.style.cssText = 'font-size:10px;padding:4px 8px';
-      splitBtn.addEventListener('click', () => {
+      card.querySelector('.split-btn').addEventListener('click', () => {
         const ids = prompt('Enter doubt IDs to extract (comma-separated):');
         if (ids) {
           const doubtIds = ids.split(',').map(s => s.trim()).filter(Boolean);
           DoubtNetAPI.send({ type: 'split_cluster', cluster_id: cid, doubt_ids: doubtIds });
         }
       });
-
-      actions.appendChild(mergeBtn);
-      actions.appendChild(splitBtn);
-
-      const doubtsEl = document.createElement('div');
-      doubtsEl.className = 'cluster-doubts';
-      doubtsEl.textContent = `IDs: ${c.doubt_ids.join(', ')}`;
-      doubtsEl.style.cssText = 'font-size:10px;color:var(--static-gray);margin-top:6px';
-
-      card.appendChild(header);
-      card.appendChild(rep);
-      card.appendChild(actions);
-      card.appendChild(doubtsEl);
       clusterList.appendChild(card);
     });
   }
@@ -414,36 +529,31 @@ const Teacher = (() => {
     }
     queue.forEach((item, idx) => {
       const card = document.createElement('div');
-      card.className = 'resolution-item';
-      card.style.animationDelay = `${idx * 0.05}s`;
-
-      const priority = document.createElement('div');
-      priority.className = 'res-priority';
-      priority.textContent = `Priority: ${item.priority_score} | Freq: ${item.frequency} | Urgency: ${item.avg_urgency_score}`;
-
-      const text = document.createElement('div');
-      text.className = 'res-text';
-      text.textContent = item.representative_text || '(no text)';
-
-      const stats = document.createElement('div');
-      stats.className = 'res-stats';
-      stats.textContent = `Cluster: ${item.cluster_id}`;
-
-      const resolveBtn = document.createElement('button');
-      resolveBtn.className = 'btn-ghost';
-      resolveBtn.textContent = 'Mark Resolved';
-      resolveBtn.style.cssText = 'border-color:var(--dn-emerald);color:var(--dn-emerald);margin-top:8px;';
-      resolveBtn.addEventListener('click', () => {
-        DoubtNetAPI.send({ type: 'resolve_doubt', cluster_id: item.cluster_id });
-        card.remove();
-        UI.toast('Cluster resolved!', 'success');
+      card.className = 'pinned-note pending';
+      card.style.transform = `rotate(${(-2.5 + Math.random() * 5).toFixed(1)}deg)`;
+      card.innerHTML = `
+        <div class="pushpin"></div>
+        <div class="note-content-text">${UI.escapeHtml(item.representative_text || '(no text)')}</div>
+        <div class="note-meta-row">
+          <span class="note-author">Cluster: ${UI.escapeHtml(item.cluster_id)}</span>
+          <span style="font-weight:600;">Score: ${item.priority_score}</span>
+        </div>
+        <div class="note-meta-row" style="border:none; padding:0; margin-top:2px;">
+          <span style="font-size:10px;">Freq: ${item.frequency} | Avg Urgency: ${item.avg_urgency_score}</span>
+        </div>
+        <div class="note-action-tabs" style="margin-top: 12px; border-top: 1px dotted rgba(58,47,31,0.2); padding-top: 8px; display:flex; gap:8px;">
+          <button class="paper-tab resolve-btn" style="font-size:11px; padding: 4px 8px; flex:1; color:var(--pin-approved); background:rgba(74,124,98,0.1); border-color:rgba(74,124,98,0.3);">Resolve</button>
+          <button class="paper-tab pin-btn" style="font-size:11px; padding: 4px 8px; flex:1; color:var(--pin-pending); background:rgba(201,154,74,0.1); border-color:rgba(201,154,74,0.3);">Pin</button>
+        </div>
+      `;
+      card.querySelector('.resolve-btn').addEventListener('click', () => {
+        if (confirm('Are you sure you want to resolve this cluster? This will archive all doubts in this cluster.')) {
+          DoubtNetAPI.send({ type: 'resolve_doubt', cluster_id: item.cluster_id });
+          card.remove();
+          UI.toast('Cluster resolved!', 'success');
+        }
       });
-
-      const pinBtn = document.createElement('button');
-      pinBtn.className = 'btn-ghost';
-      pinBtn.textContent = 'Pin to Board';
-      pinBtn.style.cssText = 'border-color:var(--dn-amber);color:var(--dn-amber);margin-top:8px;margin-left:8px;';
-      pinBtn.addEventListener('click', () => {
+      card.querySelector('.pin-btn').addEventListener('click', () => {
         const firstDoubtId = item.doubt_ids && item.doubt_ids.length > 0 ? item.doubt_ids[0] : null;
         if (firstDoubtId) {
           DoubtNetAPI.send({ type: 'pin_doubt', id: firstDoubtId });
@@ -452,12 +562,6 @@ const Teacher = (() => {
           UI.toast('No doubt IDs in cluster to pin.', 'error');
         }
       });
-
-      card.appendChild(priority);
-      card.appendChild(text);
-      card.appendChild(stats);
-      card.appendChild(resolveBtn);
-      card.appendChild(pinBtn);
       resolutionList.appendChild(card);
     });
   }
@@ -468,22 +572,23 @@ const Teacher = (() => {
       teacherLB.innerHTML = '<p class="empty-state">No leaderboard data yet. Finalize clusters first.</p>';
       return;
     }
-    const table = document.createElement('div');
-    entries.forEach((e, i) => {
-      const row = UI.el('div', 'lb-entry');
-      row.style.animationDelay = `${i * 0.03}s`;
-      const rank = UI.el('span', 'lb-rank', `#${e.rank}`);
+    entries.slice(0, 5).forEach((e, i) => {
+      const card = UI.el('div', `lb-note rank-${e.rank}`);
+      card.style.transform = `rotate(${(-2.5 + Math.random() * 5).toFixed(1)}deg)`;
+      
+      const pin = UI.el('div', 'pushpin');
+      const rank = UI.el('div', 'lb-note-rank', `#${e.rank}`);
       const name = e.real_name && e.show_real_name ? `${e.handle} (${e.real_name})` : e.handle;
-      const handle = UI.el('span', 'lb-handle', name);
-      const pts = UI.el('span', 'lb-points', `${e.total_points} pts`);
-      row.appendChild(rank);
-      row.appendChild(handle);
-      row.appendChild(pts);
-      table.appendChild(row);
+      const handle = UI.el('div', 'lb-note-handle', name);
+      const pts = UI.el('div', 'lb-note-points', `${e.total_points} pts`);
+      
+      card.appendChild(pin);
+      card.appendChild(rank);
+      card.appendChild(handle);
+      card.appendChild(pts);
+      teacherLB.appendChild(card);
     });
-    teacherLB.appendChild(table);
 
-    // Also show to students if we're revealing
     if (entries.length > 0) {
       UI.confetti(document.getElementById('confetti-canvas') || document.body);
     }
@@ -535,10 +640,16 @@ const Teacher = (() => {
 
     const roomText = roomDisplay ? roomDisplay.textContent : 'Classroom';
     
+    // Escape helper for the export document (prevents XSS in exported HTML)
+    function esc(str) {
+      if (str == null) return '';
+      return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+    }
+
     let lbRows = '';
     latestLeaderboard.forEach(e => {
-      const name = e.real_name && e.show_real_name ? `${e.handle} (${e.real_name})` : e.handle;
-      lbRows += `<tr><td>#${e.rank}</td><td>${name}</td><td>${e.total_points} pts</td></tr>`;
+      const name = e.real_name && e.show_real_name ? `${esc(e.handle)} (${esc(e.real_name)})` : esc(e.handle);
+      lbRows += `<tr><td>#${esc(e.rank)}</td><td>${name}</td><td>${esc(e.total_points)} pts</td></tr>`;
     });
     if (!lbRows) lbRows = '<tr><td colspan="3" style="text-align:center;">No leaderboard data available</td></tr>';
 
@@ -547,9 +658,9 @@ const Teacher = (() => {
       const c = latestClusters[cid];
       clusterCards += `
         <div style="border: 1px solid #ddd; padding: 12px; margin-bottom: 12px; border-radius: 6px;">
-          <h4 style="margin: 0 0 6px; font-family: monospace;">Cluster: ${cid} (${c.size} doubts)</h4>
-          <p style="margin: 0 0 8px; font-size: 14px; font-weight: bold;">"${c.representative_text}"</p>
-          <span style="font-size: 11px; color: #666;">Doubt IDs: ${c.doubt_ids.join(', ')}</span>
+          <h4 style="margin: 0 0 6px; font-family: monospace;">Cluster: ${esc(cid)} (${esc(c.size)} doubts)</h4>
+          <p style="margin: 0 0 8px; font-size: 14px; font-weight: bold;">"${esc(c.representative_text)}"</p>
+          <span style="font-size: 11px; color: #666;">Doubt IDs: ${c.doubt_ids.map(id => esc(id)).join(', ')}</span>
         </div>
       `;
     });
@@ -557,7 +668,7 @@ const Teacher = (() => {
 
     let approvedDoubtsRows = '';
     latestApprovedDoubts.forEach(d => {
-      approvedDoubtsRows += `<li><strong>@${d.username}</strong> (Day ${d.day}): "${d.text}"</li>`;
+      approvedDoubtsRows += `<li><strong>@${esc(d.username)}</strong> (Day ${esc(d.day)}): "${esc(d.text)}"</li>`;
     });
     if (!approvedDoubtsRows) approvedDoubtsRows = '<li>No approved doubts in this session</li>';
 
