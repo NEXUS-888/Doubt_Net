@@ -266,7 +266,7 @@ async def _handle_student_message(websocket, manager, username, msg_type, data, 
         "auto_cluster", "get_clusters", "merge_clusters", "split_cluster", 
         "undo_cluster", "finalize_clusters", "get_resolution_queue", 
         "resolve_doubt", "start_demo_mode", "stop_demo_mode", 
-        "toggle_allow_all_doubts", "pin_doubt"
+        "toggle_allow_all_doubts", "pin_doubt", "reveal_leaderboard"
     }
     if msg_type in teacher_messages and role != "teacher":
         await websocket.send(protocol.msg_error("Unauthorized: Teacher role required."))
@@ -454,6 +454,11 @@ async def _handle_teacher_message(websocket, manager, username, msg_type, data, 
     elif msg_type == "get_leaderboard":
         entries = points.get_leaderboard(ws, room_code)
         await websocket.send(protocol.msg_leaderboard(entries))
+
+    elif msg_type == "reveal_leaderboard":
+        entries = points.get_leaderboard(ws, room_code)
+        # Broadcast the reveal to everyone in the room
+        await manager.broadcast_to_room(room_code, protocol.msg_reveal_leaderboard(entries))
 
     elif msg_type == "get_resolution_queue":
         approved = doubts.get_approved_doubts(ws, room_code)

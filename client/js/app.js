@@ -8,6 +8,23 @@
 const App = (() => {
   let _username = null;
   let _role = null;
+  let _session = null;
+  let reconnectAttempts = 0;
+
+  function setSession(username, password, role) {
+    _session = { username, password, role };
+  }
+
+  function setRoomSession(roomCode, roomName) {
+    if (_session) {
+      _session.roomCode = roomCode;
+      _session.roomName = roomName;
+    }
+  }
+
+  function clearSession() {
+    _session = null;
+  }
 
   function generateRandomCode() {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -109,6 +126,9 @@ const App = (() => {
     DoubtNetAPI.off('rooms_list');
     DoubtNetAPI.off('auth_error');
 
+    // Store room session details
+    setRoomSession(roomCode, roomName);
+
     // Mark connection as in-room so auto-reconnect is active for unexpected drops
     DoubtNetAPI.setInRoom(true);
 
@@ -125,6 +145,7 @@ const App = (() => {
     if (logoutBtn) {
       logoutBtn.addEventListener('click', () => {
         DoubtNetAPI.disconnect();
+        clearSession();
         _username = null;
         _role = null;
         UI.showScreen('landing-screen');
@@ -159,11 +180,11 @@ const App = (() => {
         DoubtNetAPI.off('room_entered');
         DoubtNetAPI.on('room_entered', (data) => {
           DoubtNetAPI.off('room_entered');
+          nameInput.value = '';
           onAuthenticated(data.username, data.role, data.state, data.room_code, data.room_name, data.protocol_version);
         });
 
         DoubtNetAPI.send({ type: 'create_room', room_name: roomName, room_code: roomCode });
-        nameInput.value = '';
       });
     }
 
@@ -188,11 +209,11 @@ const App = (() => {
         DoubtNetAPI.off('room_entered');
         DoubtNetAPI.on('room_entered', (data) => {
           DoubtNetAPI.off('room_entered');
+          codeInput.value = '';
           onAuthenticated(data.username, data.role, data.state, data.room_code, data.room_name, data.protocol_version);
         });
 
         DoubtNetAPI.send({ type: 'join_room', room_code: roomCode });
-        codeInput.value = '';
       });
     }
   }
@@ -208,6 +229,88 @@ const App = (() => {
     Auth.init();
     bindPickerEvents();
 
+    // Listen for WebSocket open/close for reconnect banner & Session Resume
+    DoubtNetAPI.on('close', () => {
+      const banner = document.getElementById('connection-status-banner');
+      if (!banner || !DoubtNetAPI.isInRoom()) return;
+
+      reconnectAttempts++;
+      if (reconnectAttempts > 5) {
+        banner.textContent = "Disconnected — please check your internet connection or refresh.";
+        banner.className = "connection-status-banner disconnected";
+        banner.classList.remove('hidden');
+      } else {
+        banner.textContent = "Reconnecting...";
+        banner.className = "connection-status-banner reconnecting";
+        banner.classList.remove('hidden');
+      }
+    });
+
+    DoubtNetAPI.on('open', () => {
+      reconnectAttempts = 0;
+      const banner = document.getElementById('connection-status-banner');
+      if (!banner) return;
+
+      if (_session && DoubtNetAPI.isInRoom()) {
+        banner.textContent = "Connected";
+        banner.className = "connection-status-banner connected";
+
+        // Auto re-auth
+        DoubtNetAPI.off('rooms_list');
+        DoubtNetAPI.on('rooms_list', (data) => {
+          DoubtNetAPI.off('rooms_list');
+          // Auto select room
+          DoubtNetAPI.off('room_entered');
+          DoubtNetAPI.on('room_entered', (enteredData) => {
+            DoubtNetAPI.off('room_entered');
+            onAuthenticated(
+              enteredData.username,
+              enteredData.role,
+              enteredData.state,
+              enteredData.room_code,
+              enteredData.room_name,
+              enteredData.protocol_version
+            );
+            // Hide banner after 2s
+            setTimeout(() => {
+              banner.classList.add('hidden');
+            }, 2000);
+          });
+          DoubtNetAPI.send({ type: 'select_room', room_code: _session.roomCode });
+        });
+
+        DoubtNetAPI.send({ type: 'login', username: _session.username, password: _session.password });
+      } else {
+        banner.classList.add('hidden');
+      }
+    });
+
+    // Listen for reveal_leaderboard broadcast
+    DoubtNetAPI.on('reveal_leaderboard', (data) => {
+      UI.showScreen('leaderboard-screen');
+      UI.renderPodium(data.entries || []);
+      UI.confetti(document.getElementById('confetti-canvas') || document.body);
+    });
+
+    // Leaderboard close button
+    const lbCloseBtn = document.getElementById('lb-close-btn');
+    if (lbCloseBtn) {
+      lbCloseBtn.addEventListener('click', () => {
+        const prev = UI.getPreviousScreen();
+        if (prev) {
+          UI.showScreen(prev);
+        } else {
+          if (_role === 'teacher') {
+            UI.showScreen('teacher-screen');
+          } else if (_role === 'student') {
+            UI.showScreen('student-screen');
+          } else {
+            UI.showScreen('landing-screen');
+          }
+        }
+      });
+    }
+
     window.addEventListener('error', (event) => {
       console.error('Unhandled runtime error:', event.error);
       UI.toast('An unexpected error occurred. Please refresh.', 'error');
@@ -219,7 +322,7 @@ const App = (() => {
     });
   }
 
-  return { init, onAuthenticated, showRoomPicker };
+  return { init, onAuthenticated, showRoomPicker, setSession, setRoomSession, clearSession };
 })();
 
 document.addEventListener('DOMContentLoaded', App.init);

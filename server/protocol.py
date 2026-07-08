@@ -31,6 +31,7 @@ REQUIRED_FIELDS = {
     "resolve_doubt": ["cluster_id"],
     "merge_clusters": ["cluster_a", "cluster_b"],
     "split_cluster": ["cluster_id", "doubt_ids"],
+    "reveal_leaderboard": [],
 }
 
 
@@ -139,6 +140,10 @@ def msg_cluster_updated(clusters: dict) -> str:
 
 def msg_leaderboard(entries: list) -> str:
     return encode({"type": "leaderboard", "entries": entries})
+
+
+def msg_reveal_leaderboard(entries: list) -> str:
+    return encode({"type": "reveal_leaderboard", "entries": entries})
 
 
 def msg_points_finalized() -> str:

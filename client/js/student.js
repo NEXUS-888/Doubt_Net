@@ -67,10 +67,18 @@ const Student = (() => {
     });
 
     urgencyOptions.forEach(opt => {
+      opt.setAttribute('tabindex', '0');
       opt.addEventListener('click', () => {
         urgencyOptions.forEach(o => o.classList.remove('active'));
         opt.classList.add('active');
-        opt.querySelector('input').checked = true;
+        const input = opt.querySelector('input');
+        if (input) input.checked = true;
+      });
+      opt.addEventListener('keydown', (e) => {
+        if (e.key === ' ' || e.key === 'Enter') {
+          e.preventDefault();
+          opt.click();
+        }
       });
     });
 
@@ -204,9 +212,10 @@ const Student = (() => {
 
     const canSubmit = phase === 'doubt_window' || phase === 'grace_period';
     doubtFormArea.classList.toggle('disabled', !canSubmit);
+    doubtInput.disabled = !canSubmit;
     submitBtn.disabled = !canSubmit || doubtInput.value.length < 10;
     if (!canSubmit) {
-      submitBtn.textContent = canSubmit ? 'Submit Doubt' : 'Awaiting doubt window...';
+      submitBtn.textContent = 'Awaiting doubt window...';
     } else {
       submitBtn.textContent = 'Submit Doubt';
     }
@@ -368,6 +377,13 @@ const Student = (() => {
       card.appendChild(pts);
       studentLB.appendChild(card);
     });
+
+    // Add footnote explainer
+    const footnote = document.createElement('p');
+    footnote.className = 'typewriter-subhead';
+    footnote.style.cssText = 'font-size: 11px; margin-top: 16px; text-align: center; color: var(--chalk-muted); width: 100%;';
+    footnote.textContent = 'Points are awarded after your teacher finalizes clusters.';
+    studentLB.appendChild(footnote);
   }
 
   return { start };

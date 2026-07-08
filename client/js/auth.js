@@ -74,6 +74,35 @@ const Auth = (() => {
     roleStudent.addEventListener('click', () => setRole('student'));
     roleTeacher.addEventListener('click', () => setRole('teacher'));
 
+    const toggleBtn = document.getElementById('password-toggle-btn');
+    if (toggleBtn) {
+      toggleBtn.addEventListener('click', () => {
+        const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+        passwordInput.setAttribute('type', type);
+        toggleBtn.textContent = type === 'password' ? 'Show' : 'Hide';
+      });
+    }
+
+    const toggleAdvanced = document.getElementById('toggle-advanced-settings');
+    const advancedPanel = document.getElementById('advanced-settings-panel');
+    if (toggleAdvanced && advancedPanel) {
+      toggleAdvanced.addEventListener('click', (e) => {
+        e.preventDefault();
+        advancedPanel.classList.toggle('hidden');
+      });
+    }
+
+    // Double click wordmark to toggle advanced settings
+    const wordmarks = document.querySelectorAll('.chalk-wordmark, .chalk-wordmark-sm');
+    wordmarks.forEach(wm => {
+      wm.addEventListener('dblclick', () => {
+        if (advancedPanel) {
+          advancedPanel.classList.toggle('hidden');
+          UI.toast('Advanced configuration panel toggled.', 'info');
+        }
+      });
+    });
+
     authForm.addEventListener('submit', (e) => {
       e.preventDefault();
       handleSubmit();
@@ -85,7 +114,7 @@ const Auth = (() => {
     tabLogin.classList.toggle('active', !register);
     tabRegister.classList.toggle('active', register);
     roleRow.classList.toggle('hidden', !register);
-    submitLabel.textContent = register ? 'Create Account' : 'Connect';
+    submitLabel.textContent = register ? 'Create Account' : 'Sign in';
     authError.textContent = '';
   }
 
@@ -136,6 +165,9 @@ const Auth = (() => {
     const msg = isRegister
       ? { type: 'register', username, password, role: currentRole }
       : { type: 'login', username, password };
+
+    // Store credentials in in-memory SessionStore
+    App.setSession(username, password, currentRole);
 
     brandDot.classList.remove('online');
     authError.textContent = 'Connecting...';

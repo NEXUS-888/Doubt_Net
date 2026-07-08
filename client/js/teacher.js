@@ -62,6 +62,7 @@ const Teacher = (() => {
 
     logoutBtn.addEventListener('click', () => {
       DoubtNetAPI.disconnect();
+      App.clearSession();
       window.location.reload();
     });
 
@@ -72,10 +73,24 @@ const Teacher = (() => {
         Object.keys(panels).forEach(key => panels[key].classList.remove('active'));
         const panel = panels[tab.dataset.tab];
         if (panel) panel.classList.add('active');
-        if (tab.dataset.tab === 'clusters') requestClusters();
-        if (tab.dataset.tab === 'live') requestDoubts();
-        if (tab.dataset.tab === 'resolution') requestResolution();
-        if (tab.dataset.tab === 'leaderboard') requestLeaderboard();
+        
+        if (tab.dataset.tab === 'clusters') {
+          UI.showSkeleton('cluster-list', 3);
+          requestClusters();
+        }
+        if (tab.dataset.tab === 'live') {
+          UI.showSkeleton('moderation-list', 2);
+          UI.showSkeleton('live-approved-list', 3);
+          requestDoubts();
+        }
+        if (tab.dataset.tab === 'resolution') {
+          UI.showSkeleton('resolution-list', 3);
+          requestResolution();
+        }
+        if (tab.dataset.tab === 'leaderboard') {
+          UI.showSkeleton('teacher-leaderboard-body', 4);
+          requestLeaderboard();
+        }
       });
     });
 
@@ -144,15 +159,19 @@ const Teacher = (() => {
     });
 
     finalizeBtn.addEventListener('click', () => {
-      if (confirm('Finalize clusters? This will compute points and cannot be undone.')) {
-        DoubtNetAPI.send({ type: 'finalize_clusters' });
-        UI.toast('Clusters finalized! Points computed.', 'success');
-      }
+      UI.Modal.showConfirm(
+        'Finalize Clusters',
+        'Finalize clusters? This will compute points and cannot be undone.',
+        () => {
+          DoubtNetAPI.send({ type: 'finalize_clusters' });
+          UI.toast('Clusters finalized! Points computed.', 'success');
+        }
+      );
     });
 
     refreshLB.addEventListener('click', requestLeaderboard);
     revealLB.addEventListener('click', () => {
-      DoubtNetAPI.send({ type: 'get_leaderboard' });
+      DoubtNetAPI.send({ type: 'reveal_leaderboard' });
     });
 
     const unpinBtn = document.getElementById('teacher-unpin-btn');
@@ -391,7 +410,7 @@ const Teacher = (() => {
   function renderModeration(flagged) {
     modList.innerHTML = '';
     if (!flagged || flagged.length === 0) {
-      modList.innerHTML = '<p class="empty-state">No doubts pinned yet — be the first.</p>';
+      modList.innerHTML = '<p class="empty-state">No pending doubts to moderate.</p>';
       return;
     }
     flagged.forEach(d => {
@@ -412,15 +431,69 @@ const Teacher = (() => {
           <button class="paper-tab mod-reject" style="font-size:11px; padding: 4px 8px; background: rgba(184, 68, 60, 0.1); border-color: rgba(184, 68, 60, 0.3); color: var(--pin-flagged); flex: 1;" data-id="${d.id}">Reject</button>
         </div>
       `;
-      item.querySelector('.mod-approve').addEventListener('click', () => {
-        DoubtNetAPI.send({ type: 'moderate_doubt', doubt_id: d.id, action: 'approve' });
-        item.remove();
-        UI.toast('Doubt approved', 'success');
+      const approveBtn = item.querySelector('.mod-approve');
+      const rejectBtn = item.querySelector('.mod-reject');
+
+      const setPending = (pending) => {
+        approveBtn.disabled = pending;
+        rejectBtn.disabled = pending;
+        if (pending) {
+          approveBtn.textContent = '...';
+          rejectBtn.textContent = '...';
+        } else {
+          approveBtn.textContent = 'Approve';
+          rejectBtn.textContent = 'Reject';
+        }
+      };
+
+      approveBtn.addEventListener('click', () => {
+        setPending(true);
+        const sent = DoubtNetAPI.send({ type: 'moderate_doubt', doubt_id: d.id, action: 'approve' });
+        if (!sent) {
+          setPending(false);
+          UI.toast('Failed to send request. Offline.', 'error');
+          return;
+        }
+
+        const timeout = setTimeout(() => {
+          setPending(false);
+          UI.toast('Request timed out. Please try again.', 'error');
+        }, 10000);
+
+        const onDone = (resp) => {
+          if (String(resp.doubt_id) === String(d.id)) {
+            DoubtNetAPI.off('moderation_done', onDone);
+            clearTimeout(timeout);
+            item.remove();
+            UI.toast('Doubt approved', 'success');
+          }
+        };
+        DoubtNetAPI.on('moderation_done', onDone);
       });
-      item.querySelector('.mod-reject').addEventListener('click', () => {
-        DoubtNetAPI.send({ type: 'moderate_doubt', doubt_id: d.id, action: 'reject' });
-        item.remove();
-        UI.toast('Doubt rejected', 'info');
+
+      rejectBtn.addEventListener('click', () => {
+        setPending(true);
+        const sent = DoubtNetAPI.send({ type: 'moderate_doubt', doubt_id: d.id, action: 'reject' });
+        if (!sent) {
+          setPending(false);
+          UI.toast('Failed to send request. Offline.', 'error');
+          return;
+        }
+
+        const timeout = setTimeout(() => {
+          setPending(false);
+          UI.toast('Request timed out. Please try again.', 'error');
+        }, 10000);
+
+        const onDone = (resp) => {
+          if (String(resp.doubt_id) === String(d.id)) {
+            DoubtNetAPI.off('moderation_done', onDone);
+            clearTimeout(timeout);
+            item.remove();
+            UI.toast('Doubt rejected', 'info');
+          }
+        };
+        DoubtNetAPI.on('moderation_done', onDone);
       });
       modList.appendChild(item);
     });
@@ -430,29 +503,11 @@ const Teacher = (() => {
     const list = document.getElementById('live-approved-list');
     list.innerHTML = '';
     if (!approved || approved.length === 0) {
-      list.innerHTML = '<p class="empty-state">No doubts pinned yet — be the first.</p>';
+      list.innerHTML = '<p class="empty-state">No approved doubts yet.</p>';
       return;
     }
 
-    // Populate scattered background decor notes to fill empty space
-    const decorBoard = document.getElementById('scattered-decor-board');
-    if (decorBoard) {
-      decorBoard.innerHTML = '';
-      approved.slice(0, 3).forEach((d, idx) => {
-        const card = document.createElement('div');
-        card.className = 'pinned-note approved';
-        card.style.transform = `rotate(${(-3 + Math.random() * 6).toFixed(1)}deg)`;
-        card.style.opacity = '0.55';
-        card.innerHTML = `
-          <div class="pushpin"></div>
-          <div class="note-content-text">${UI.escapeHtml(d.text)}</div>
-          <div class="note-meta-row">
-            <span class="note-author">Day ${d.day} — resolved</span>
-          </div>
-        `;
-        decorBoard.appendChild(card);
-      });
-    }
+
 
     [...approved].reverse().forEach(d => {
       const item = document.createElement('div');
@@ -481,7 +536,7 @@ const Teacher = (() => {
     clusterList.innerHTML = '';
     const keys = Object.keys(clusters);
     if (keys.length === 0) {
-      clusterList.innerHTML = '<p class="empty-state">No doubts pinned yet — be the first.</p>';
+      clusterList.innerHTML = '<p class="empty-state">No doubt clusters computed yet.</p>';
       return;
     }
     keys.forEach((cid, idx) => {
@@ -505,17 +560,66 @@ const Teacher = (() => {
         </div>
       `;
       card.querySelector('.merge-btn').addEventListener('click', () => {
-        const target = prompt('Enter cluster ID to merge into this one:');
-        if (target && target !== cid) {
-          DoubtNetAPI.send({ type: 'merge_clusters', cluster_a: cid, cluster_b: target });
+        let optionsHtml = '<select id="merge-target-select">';
+        Object.keys(latestClusters).forEach(otherId => {
+          if (otherId !== cid) {
+            const preview = latestClusters[otherId].representative_text || `Cluster ${otherId}`;
+            optionsHtml += `<option value="${otherId}">Cluster ${otherId} ("${UI.escapeHtml(preview.substring(0, 40))}...")</option>`;
+          }
+        });
+        optionsHtml += '</select>';
+
+        if (Object.keys(latestClusters).length <= 1) {
+          UI.toast('No other clusters to merge with.', 'error');
+          return;
         }
+
+        UI.Modal.showPrompt(
+          'Merge Clusters',
+          `Select a cluster to merge into Cluster ${cid}:`,
+          optionsHtml,
+          (targetId) => {
+            if (targetId && targetId !== cid) {
+              DoubtNetAPI.send({ type: 'merge_clusters', cluster_a: cid, cluster_b: targetId });
+              UI.toast('Merging clusters...', 'info');
+            }
+          }
+        );
       });
       card.querySelector('.split-btn').addEventListener('click', () => {
-        const ids = prompt('Enter doubt IDs to extract (comma-separated):');
-        if (ids) {
-          const doubtIds = ids.split(',').map(s => s.trim()).filter(Boolean);
-          DoubtNetAPI.send({ type: 'split_cluster', cluster_id: cid, doubt_ids: doubtIds });
+        let checkboxesHtml = '<div style="max-height: 200px; overflow-y: auto; text-align: left; margin-top: 12px;">';
+        c.doubt_ids.forEach(did => {
+          const doubtObj = latestApprovedDoubts.find(d => String(d.id) === String(did));
+          const text = doubtObj ? doubtObj.text : `Doubt ${did}`;
+          checkboxesHtml += `
+            <label style="display: flex; align-items: flex-start; gap: 8px; margin-bottom: 8px; cursor: pointer;">
+              <input type="checkbox" value="${did}" style="width: auto; margin-top: 3px;">
+              <span>"${UI.escapeHtml(text)}" <small style="color:var(--chalk-muted)">(ID: ${did})</small></span>
+            </label>
+          `;
+        });
+        checkboxesHtml += '</div>';
+
+        if (c.doubt_ids.length <= 1) {
+          UI.toast('Cannot split a cluster with 1 or fewer doubts.', 'error');
+          return;
         }
+
+        UI.Modal.showPrompt(
+          'Split Cluster',
+          `Select doubts to split out of Cluster ${cid}:`,
+          checkboxesHtml,
+          (selectedIds) => {
+            if (selectedIds && selectedIds.length > 0) {
+              if (selectedIds.length === c.doubt_ids.length) {
+                UI.toast('Cannot split all doubts out of a cluster. Select at least one fewer.', 'error');
+                return;
+              }
+              DoubtNetAPI.send({ type: 'split_cluster', cluster_id: cid, doubt_ids: selectedIds });
+              UI.toast('Splitting cluster...', 'info');
+            }
+          }
+        );
       });
       clusterList.appendChild(card);
     });
@@ -547,11 +651,14 @@ const Teacher = (() => {
         </div>
       `;
       card.querySelector('.resolve-btn').addEventListener('click', () => {
-        if (confirm('Are you sure you want to resolve this cluster? This will archive all doubts in this cluster.')) {
-          DoubtNetAPI.send({ type: 'resolve_doubt', cluster_id: item.cluster_id });
-          card.remove();
-          UI.toast('Cluster resolved!', 'success');
-        }
+        UI.Modal.showConfirm(
+          'Resolve Cluster',
+          `Are you sure you want to resolve Cluster ${item.cluster_id}? This will archive all doubts in this cluster.`,
+          () => {
+            DoubtNetAPI.send({ type: 'resolve_doubt', cluster_id: item.cluster_id });
+            UI.toast('Cluster resolved!', 'success');
+          }
+        );
       });
       card.querySelector('.pin-btn').addEventListener('click', () => {
         const firstDoubtId = item.doubt_ids && item.doubt_ids.length > 0 ? item.doubt_ids[0] : null;
@@ -589,9 +696,6 @@ const Teacher = (() => {
       teacherLB.appendChild(card);
     });
 
-    if (entries.length > 0) {
-      UI.confetti(document.getElementById('confetti-canvas') || document.body);
-    }
   }
 
   function playChime() {

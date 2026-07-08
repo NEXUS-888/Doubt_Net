@@ -231,11 +231,19 @@
   }
 }
 
-@keyframes neon-glow {
-  0%, 100% {
-    box-shadow: 0 0 4px var(--dn-violet), 0 0 10px rgba(167, 139, 250, 0.6);
+/* ---------- Accessibility: Prefers Reduced Motion ---------- */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-delay: 0s !important;
+    animation-duration: 0s !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0s !important;
+    scroll-behavior: auto !important;
   }
-  50% {
-    box-shadow: 0 0 8px var(--dn-pink), 0 0 20px rgba(236, 72, 153, 0.6);
+
+  /* Retain brief transitions only for Toast notifications and modal triggers for UX feedback */
+  .toast, .themed-modal, .themed-modal-content {
+    transition: opacity 0.1s ease-in-out !important;
+    animation-duration: 0.1s !important;
   }
 }

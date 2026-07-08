@@ -16,6 +16,7 @@
 <body>
 
 <div class="bg-grid" aria-hidden="true"></div>
+<div id="connection-status-banner" class="connection-status-banner hidden">Connected</div>
 
 <!-- ============ LANDING SCREEN ============ -->
 <main id="landing-screen" class="screen">
@@ -84,9 +85,12 @@
         <span>Username</span>
         <input type="text" id="username-input" name="username" maxlength="20" required autocomplete="off">
       </label>
-      <label class="field">
+      <label class="field password-field-container">
         <span>Password</span>
-        <input type="text" id="password-input" name="doubtnet_pass" maxlength="64" required autocomplete="off" style="-webkit-text-security: disc;">
+        <div class="password-input-wrapper" style="position: relative; display: flex; align-items: center; width: 100%;">
+          <input type="password" id="password-input" name="doubtnet_pass" maxlength="64" required autocomplete="off" style="padding-right: 48px;">
+          <button type="button" id="password-toggle-btn" class="password-toggle-btn" style="position: absolute; right: 12px; color: var(--paper-ink); font-size: 11px; opacity: 0.6; font-family: var(--font-content); font-weight: bold;">Show</button>
+        </div>
       </label>
 
       <div id="auth-error" class="auth-error" role="alert" aria-live="polite"></div>
@@ -96,9 +100,12 @@
       </button>
     </form>
 
-    <div class="server-config-typewritten">
+    <div id="advanced-settings-panel" class="server-config-typewritten hidden">
       <span>// server url:</span>
       <input type="text" id="server-url-input" value="" placeholder="ws://localhost:8765" autocomplete="off">
+    </div>
+    <div style="text-align: center; margin-top: 12px;">
+      <a href="#" id="toggle-advanced-settings" style="font-size: 11px; text-decoration: underline; color: var(--paper-ink); opacity: 0.6; font-family: var(--font-body);">Advanced Settings</a>
     </div>
   </div>
 </main>
@@ -111,7 +118,7 @@
     </div>
     <div class="picker-header-right">
       <span class="me-label" id="picker-me-label"></span>
-      <button class="btn-ghost" id="picker-logout-btn">Log out</button>
+      <button class="btn-ghost" id="picker-logout-btn">Sign out</button>
     </div>
   </header>
 
@@ -168,7 +175,7 @@
     <div class="dash-header-right">
       <span class="points-badge" id="student-points-badge">0 pts</span>
       <span class="me-label" id="student-me-label"></span>
-      <button class="btn-ghost" id="student-logout-btn">Disconnect</button>
+      <button class="btn-ghost" id="student-logout-btn">Sign out</button>
     </div>
   </header>
 
@@ -245,7 +252,7 @@
     </div>
     <div class="dash-header-right">
       <span class="me-label" id="teacher-me-label"></span>
-      <button class="btn-ghost" id="teacher-logout-btn">Disconnect</button>
+      <button class="btn-ghost" id="teacher-logout-btn">Sign out</button>
     </div>
   </header>
 
@@ -279,7 +286,7 @@
 
           <!-- Standard Class Fields -->
           <div id="class-mode-fields">
-            <label class="field"><span>Week Start (YYYY-MM-DD)</span><input type="text" id="sched-week-start" placeholder="2026-06-30"></label>
+            <label class="field"><span>Week Start</span><input type="date" id="sched-week-start"></label>
             <div id="schedule-days"></div>
             <button id="save-schedule-btn" class="btn-primary" style="margin-top:12px">Save Schedule</button>
           </div>
@@ -300,41 +307,41 @@
 
       <div class="schedule-right-column" style="flex: 1.5; display: flex; gap: 24px; flex-wrap: wrap; justify-content: flex-start; min-width: 320px;">
         <!-- Stats Card -->
-        <div class="pinned-note pending" id="schedule-stats-card" style="transform: rotate(2deg); width: 280px; min-height: 250px; flex-shrink: 0;">
+        <div class="pinned-note pending stats-note" id="schedule-stats-card">
           <div class="pushpin"></div>
-          <div class="note-content-text" style="font-family: 'Permanent Marker', cursive; font-size: 22px; text-align: center; border-bottom: 2px dashed rgba(58,47,31,0.2); padding-bottom: 8px; margin-bottom: 12px;">
+          <div class="note-content-text stats-note-title">
             Session Stats
           </div>
-          <div style="display: flex; flex-direction: column; gap: 12px; font-family: 'IBM Plex Sans', sans-serif; color: var(--paper-ink); font-size: 14px;">
-            <div style="display: flex; justify-content: space-between; font-weight: bold; border-bottom: 1px dotted rgba(58,47,31,0.15); padding-bottom: 4px;">
+          <div class="stats-note-body">
+            <div class="stats-note-row">
               <span>Audience Online:</span>
-              <span id="stats-online-count" style="font-family: 'Special Elite', monospace;">0</span>
+              <span id="stats-online-count" class="stats-note-val">0</span>
             </div>
-            <div style="display: flex; justify-content: space-between; font-weight: bold; border-bottom: 1px dotted rgba(58,47,31,0.15); padding-bottom: 4px;">
+            <div class="stats-note-row">
               <span>Total Doubts:</span>
-              <span id="stats-doubts-count" style="font-family: 'Special Elite', monospace;">0</span>
+              <span id="stats-doubts-count" class="stats-note-val">0</span>
             </div>
-            <div style="display: flex; justify-content: space-between; font-weight: bold; border-bottom: 1px dotted rgba(58,47,31,0.15); padding-bottom: 4px;">
+            <div class="stats-note-row">
               <span>Feedback Submitted:</span>
-              <span id="stats-feedback-count" style="font-family: 'Special Elite', monospace;">0</span>
+              <span id="stats-feedback-count" class="stats-note-val">0</span>
             </div>
             <div style="display: flex; justify-content: space-between; font-weight: bold;">
               <span>Resolved Doubts:</span>
-              <span id="stats-resolved-count" style="font-family: 'Special Elite', monospace;">0</span>
+              <span id="stats-resolved-count" class="stats-note-val">0</span>
             </div>
           </div>
         </div>
 
         <!-- Quick Guide Card -->
-        <div class="pinned-note approved" id="schedule-guide-card" style="transform: rotate(-1.5deg); width: 280px; min-height: 250px; flex-shrink: 0;">
+        <div class="pinned-note approved guide-note" id="schedule-guide-card">
           <div class="pushpin"></div>
-          <div class="note-content-text" style="font-family: 'Permanent Marker', cursive; font-size: 20px; text-align: center; border-bottom: 2px dashed rgba(58,47,31,0.2); padding-bottom: 8px; margin-bottom: 12px;">
+          <div class="note-content-text guide-note-title">
             Speaker Guide
           </div>
-          <ul style="font-family: 'Special Elite', monospace; font-size: 13px; color: var(--paper-ink); padding-left: 16px; margin: 0; line-height: 1.6;">
-            <li style="margin-bottom: 6px;">Moderation lane filters profanity. Approve notes to post them.</li>
-            <li style="margin-bottom: 6px;">Click Auto-Cluster to group similar questions using AI.</li>
-            <li style="margin-bottom: 6px;">Use the Resolution lane to discuss questions in order.</li>
+          <ul class="guide-note-list">
+            <li>Moderation lane filters profanity. Approve notes to post them.</li>
+            <li>Click Auto-Cluster to group similar questions using AI.</li>
+            <li>Use the Resolution lane to discuss questions in order.</li>
             <li>Finalizing awards points to active participants.</li>
           </ul>
         </div>
@@ -389,9 +396,22 @@
     <h1 class="lb-title">Leaderboard</h1>
     <div class="podium" id="podium"></div>
     <div class="lb-list" id="lb-full-list"></div>
+    <button class="btn-ghost lb-close-btn" id="lb-close-btn" style="margin-top: 24px; padding: 10px 24px;">Back to Dashboard</button>
     <canvas id="confetti-canvas" class="confetti-canvas"></canvas>
   </div>
 </main>
+
+<!-- Themed Dialog Modal overlay -->
+<div id="themed-modal" class="themed-modal hidden" role="dialog" aria-modal="true">
+  <div class="themed-modal-content">
+    <h3 id="themed-modal-title" class="themed-modal-title">Confirm Action</h3>
+    <div id="themed-modal-body" class="themed-modal-body"></div>
+    <div class="themed-modal-actions">
+      <button id="themed-modal-cancel" class="btn-ghost">Cancel</button>
+      <button id="themed-modal-confirm" class="btn-primary">Confirm</button>
+    </div>
+  </div>
+</div>
 
 <div id="toast-container" class="toast-container" aria-live="polite"></div>
 

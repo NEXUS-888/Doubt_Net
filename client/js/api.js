@@ -120,5 +120,9 @@ const DoubtNetAPI = (() => {
     (events[type] || []).forEach(cb => cb(data));
   }
 
-  return { connect, disconnect, send, isOpen, on, off, setInRoom };
+  function isInRoom() {
+    return inRoom;
+  }
+
+  return { connect, disconnect, send, isOpen, on, off, setInRoom, isInRoom };
 })();
