@@ -17,15 +17,9 @@ const Theme = (() => {
     localStorage.setItem('doubtnet-theme', name);
   }
 
-  function cycle() {
-    const current = getCurrent();
-    const nextIdx = (THEMES.indexOf(current) + 1) % THEMES.length;
-    apply(THEMES[nextIdx]);
-  }
-
   function init() {
     apply(getCurrent());
   }
 
-  return { init, cycle, apply, getCurrent, THEMES };
+  return { init, apply, getCurrent, THEMES };
 })();

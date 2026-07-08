@@ -102,12 +102,12 @@ const App = (() => {
       card.setAttribute('data-room-code', room.code);
       card.innerHTML =
         '<div class="pushpin"></div>' +
-        '<div class="room-card-name">' + escapeHtml(room.name) + '</div>' +
-        '<div class="room-card-code">' + escapeHtml(room.code) + '</div>' +
+        '<div class="room-card-name">' + UI.escapeHtml(room.name) + '</div>' +
+        '<div class="room-card-code">' + UI.escapeHtml(room.code) + '</div>' +
         '<div class="room-card-meta">' +
-          (role === 'teacher'
-            ? room.student_count + ' student' + (room.student_count !== 1 ? 's' : '')
-            : 'Teacher: ' + escapeHtml(room.teacher)) +
+        (role === 'teacher'
+          ? room.student_count + ' student' + (room.student_count !== 1 ? 's' : '')
+          : 'Teacher: ' + UI.escapeHtml(room.teacher)) +
         '</div>';
 
       card.addEventListener('click', () => selectRoom(room.code));
@@ -229,19 +229,24 @@ const App = (() => {
     }
   }
 
-  function escapeHtml(str) {
-    const div = document.createElement('div');
-    div.textContent = str;
-    return div.innerHTML;
-  }
-
   function init() {
     Theme.init();
     Auth.init();
     bindPickerEvents();
 
+    const footerText = document.querySelector('.typewriter-footer');
+    if (footerText) {
+      footerText.textContent = "Connecting to classroom network...";
+    }
+
     // Listen for WebSocket open/close for reconnect banner & Session Resume
     DoubtNetAPI.on('close', () => {
+      const brandDot = document.getElementById('brand-dot');
+      if (brandDot) brandDot.classList.remove('online');
+      if (footerText && !DoubtNetAPI.isInRoom()) {
+        footerText.textContent = "Classroom network offline — check Advanced Settings";
+      }
+
       const banner = document.getElementById('connection-status-banner');
       if (!banner || !DoubtNetAPI.isInRoom()) return;
 
@@ -259,6 +264,12 @@ const App = (() => {
 
     DoubtNetAPI.on('open', () => {
       reconnectAttempts = 0;
+      const brandDot = document.getElementById('brand-dot');
+      if (brandDot) brandDot.classList.add('online');
+      if (footerText && !DoubtNetAPI.isInRoom()) {
+        footerText.textContent = "Classroom network online — ready";
+      }
+
       const banner = document.getElementById('connection-status-banner');
       if (!banner) return;
 
@@ -344,6 +355,14 @@ const App = (() => {
       console.error('Unhandled promise rejection:', event.reason);
       UI.toast('An unexpected network error occurred. Please check connectivity.', 'error');
     });
+
+    let ip = window.location.hostname;
+    if (!ip || ip === '') {
+      ip = window.SERVER_IP || 'localhost';
+    }
+    const wsProtocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+    const defaultUrl = `${wsProtocol}://${ip}:8765`;
+    DoubtNetAPI.connect(defaultUrl);
   }
 
   return { init, onAuthenticated, showRoomPicker, setSession, setRoomSession, clearSession, signOut };

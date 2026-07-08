@@ -208,21 +208,18 @@ const UI = (() => {
       }
     }
 
-    function initEvents() {
+    let eventsBound = false;
+    function initEventsOnce() {
+      if (eventsBound) return;
+      eventsBound = true;
       const { cancelBtn, confirmBtn, el, bodyEl } = getElements();
       if (cancelBtn && confirmBtn && el) {
-        // Remove existing listeners to avoid duplicates
-        const newCancelBtn = cancelBtn.cloneNode(true);
-        const newConfirmBtn = confirmBtn.cloneNode(true);
-        cancelBtn.parentNode.replaceChild(newCancelBtn, cancelBtn);
-        confirmBtn.parentNode.replaceChild(newConfirmBtn, confirmBtn);
-
-        newCancelBtn.addEventListener('click', () => {
+        cancelBtn.addEventListener('click', () => {
           closeModal();
           if (onCancel) onCancel();
         });
 
-        newConfirmBtn.addEventListener('click', () => {
+        confirmBtn.addEventListener('click', () => {
           closeModal();
           if (onConfirm) {
             const input = bodyEl.querySelector('input, select');
@@ -237,21 +234,30 @@ const UI = (() => {
             }
           }
         });
-
-        // Add Escape/Tab listener
-        document.addEventListener('keydown', handleKeydown);
-
-        // Autofocus first interactive element
-        setTimeout(() => {
-          const focusables = el.querySelectorAll('button, select, input, [tabindex="0"]');
-          const visibleFocusables = Array.from(focusables).filter(item => {
-            return !item.classList.contains('hidden') && item.style.display !== 'none';
-          });
-          if (visibleFocusables.length > 0) {
-            visibleFocusables[0].focus();
-          }
-        }, 50);
       }
+    }
+
+    function openModalSetup() {
+      const { el } = getElements();
+      if (!el) return;
+
+      initEventsOnce();
+
+      // Add Escape/Tab listener
+      document.addEventListener('keydown', handleKeydown);
+
+      // Autofocus first interactive element
+      setTimeout(() => {
+        const focusables = el.querySelectorAll('button, select, input, [tabindex="0"]');
+        const visibleFocusables = Array.from(focusables).filter(item => {
+          return !item.classList.contains('hidden') && item.style.display !== 'none';
+        });
+        if (visibleFocusables.length > 0) {
+          visibleFocusables[0].focus();
+        }
+      }, 50);
+
+      el.classList.remove('hidden');
     }
 
     function showConfirm(title, message, confirmCb, cancelCb) {
@@ -271,8 +277,7 @@ const UI = (() => {
         if (confirmBtn) confirmBtn.textContent = 'Confirm';
       }
 
-      initEvents();
-      el.classList.remove('hidden');
+      openModalSetup();
     }
 
     function showPrompt(title, message, inputHtml, confirmCb, cancelCb) {
@@ -292,8 +297,7 @@ const UI = (() => {
         if (confirmBtn) confirmBtn.textContent = 'Confirm';
       }
 
-      initEvents();
-      el.classList.remove('hidden');
+      openModalSetup();
     }
 
     return { showConfirm, showPrompt };

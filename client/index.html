@@ -22,7 +22,7 @@
 <main id="landing-screen" class="screen">
   <header class="landing-header">
     <div class="brand">
-      <h1 class="chalk-wordmark">Doubtnet</h1>
+      <h1 class="chalk-wordmark">DoubtNet</h1>
     </div>
     <nav class="landing-nav">
       <button class="nav-tab-quiet" id="landing-about-btn">About</button>
@@ -68,7 +68,7 @@
   <div class="auth-card" id="auth-card">
     <div class="auth-header-row">
       <span class="brand-dot" id="brand-dot"></span>
-      <h1 class="chalk-wordmark">Doubtnet</h1>
+      <h1 class="chalk-wordmark">DoubtNet</h1>
     </div>
     <p class="typewriter-subhead">Anonymous doubt resolution — submit questions without fear.</p>
 
@@ -81,15 +81,15 @@
       <button class="paper-tab" id="role-teacher" role="tab" aria-selected="false" data-role="teacher">Teacher</button>
     </div>
 
-    <form id="auth-form" autocomplete="off" onsubmit="return false">
+    <form id="auth-form" autocomplete="on" onsubmit="return false">
       <label class="field">
         <span>Username</span>
-        <input type="text" id="username-input" name="username" maxlength="20" required autocomplete="off">
+        <input type="text" id="username-input" name="username" maxlength="20" required autocomplete="username">
       </label>
       <label class="field password-field-container">
         <span>Password</span>
         <div class="password-input-wrapper" style="position: relative; display: flex; align-items: center; width: 100%;">
-          <input type="password" id="password-input" name="doubtnet_pass" maxlength="64" required autocomplete="off" style="padding-right: 48px;">
+          <input type="password" id="password-input" name="doubtnet_pass" maxlength="64" required autocomplete="current-password" style="padding-right: 48px;">
           <button type="button" id="password-toggle-btn" class="password-toggle-btn" style="position: absolute; right: 12px; color: var(--paper-ink); font-size: 11px; opacity: 0.6; font-family: var(--font-content); font-weight: bold;">Show</button>
         </div>
       </label>
@@ -103,7 +103,7 @@
 
     <div id="advanced-settings-panel" class="server-config-typewritten hidden">
       <span>// server url:</span>
-      <input type="text" id="server-url-input" value="" placeholder="ws://localhost:8765" autocomplete="off">
+      <input type="text" id="server-url-input" value="" placeholder="ws://localhost:8765">
     </div>
     <div style="text-align: center; margin-top: 12px; display: flex; flex-direction: column; gap: 8px;">
       <a href="#" id="toggle-advanced-settings" style="font-size: 11px; text-decoration: underline; color: var(--paper-ink); opacity: 0.6; font-family: var(--font-body);">Advanced Settings</a>
@@ -116,7 +116,7 @@
 <main id="room-picker-screen" class="screen hidden">
   <header class="picker-header">
     <div class="brand">
-      <h1 class="chalk-wordmark">Doubtnet</h1>
+      <h1 class="chalk-wordmark">DoubtNet</h1>
     </div>
     <div class="picker-header-right">
       <span class="me-label" id="picker-me-label"></span>
@@ -167,7 +167,7 @@
   <header class="dash-header">
     <div class="dash-header-left">
       <span class="brand-dot"></span>
-      <h1 class="chalk-wordmark-sm">Doubtnet</h1>
+      <h1 class="chalk-wordmark-sm">DoubtNet</h1>
       <span id="student-room-display" class="room-badge"></span>
     </div>
     <div class="dash-header-center">
@@ -226,6 +226,9 @@
 
         <button id="submit-doubt-btn" class="btn-primary" disabled>Submit Doubt</button>
         <span class="anon-counter" id="anon-counter">0 doubts submitted</span>
+        <p style="font-size: 11px; color: var(--chalk-muted); text-align: center; margin-top: 12px; font-family: var(--font-content);">
+          ℹ️ Doubts are anonymous to your peers, but visible to the instructor.
+        </p>
       </div>
     </section>
 
@@ -250,7 +253,7 @@
   <header class="dash-header">
     <div class="dash-header-left">
       <span class="brand-dot"></span>
-      <h1 class="chalk-wordmark-sm">Doubtnet</h1>
+      <h1 class="chalk-wordmark-sm">DoubtNet</h1>
       <span class="teacher-badge">Teacher</span>
       <span id="teacher-room-display" class="room-badge"></span>
     </div>
@@ -267,46 +270,49 @@
   </div>
 
   <div class="teacher-tabs" id="teacher-tabs" role="tablist">
-    <button class="teacher-tab active" data-tab="schedule" role="tab" aria-selected="true" aria-controls="panel-schedule">
-      <span class="tab-num">1</span><span class="tab-text"> Schedule</span>
+    <button class="teacher-tab active" id="tab-schedule" data-tab="schedule" role="tab" aria-selected="true" aria-controls="panel-schedule">
+      <span class="tab-num">1</span><span class="tab-text-long"> Schedule</span><span class="tab-text-short"> Sched</span>
     </button>
-    <button class="teacher-tab" data-tab="live" role="tab" aria-selected="false" aria-controls="panel-live">
-      <span class="tab-num">2</span><span class="tab-text"> Moderate</span>
+    <button class="teacher-tab" id="tab-live" data-tab="live" role="tab" aria-selected="false" aria-controls="panel-live">
+      <span class="tab-num">2</span><span class="tab-text-long"> Moderate</span><span class="tab-text-short"> Mod</span>
     </button>
-    <button class="teacher-tab" data-tab="clusters" role="tab" aria-selected="false" aria-controls="panel-clusters">
-      <span class="tab-num">3</span><span class="tab-text"> Cluster</span>
+    <button class="teacher-tab" id="tab-clusters" data-tab="clusters" role="tab" aria-selected="false" aria-controls="panel-clusters">
+      <span class="tab-num">3</span><span class="tab-text-long"> Cluster</span><span class="tab-text-short"> Clust</span>
     </button>
-    <button class="teacher-tab" data-tab="resolution" role="tab" aria-selected="false" aria-controls="panel-resolution">
-      <span class="tab-num">4</span><span class="tab-text"> Resolve</span>
+    <button class="teacher-tab" id="tab-resolution" data-tab="resolution" role="tab" aria-selected="false" aria-controls="panel-resolution">
+      <span class="tab-num">4</span><span class="tab-text-long"> Resolve</span><span class="tab-text-short"> Res</span>
     </button>
-    <button class="teacher-tab" data-tab="leaderboard" role="tab" aria-selected="false" aria-controls="panel-leaderboard">
-      <span class="tab-num">5</span><span class="tab-text"> Leaderboard</span>
+    <button class="teacher-tab" id="tab-leaderboard" data-tab="leaderboard" role="tab" aria-selected="false" aria-controls="panel-leaderboard">
+      <span class="tab-num">5</span><span class="tab-text-long"> Leaderboard</span><span class="tab-text-short"> LBoard</span>
     </button>
   </div>
 
   <!-- Schedule Panel -->
-  <div class="teacher-panel active" id="panel-schedule">
+  <div class="teacher-panel active" id="panel-schedule" role="tabpanel" aria-labelledby="tab-schedule" aria-hidden="false">
     <div class="schedule-layout-container" style="display: flex; gap: 40px; width: 100%; align-items: flex-start; flex-wrap: wrap;">
       
       <div class="schedule-left-column" style="flex: 1; min-width: 320px; max-width: 480px;">
         <div class="schedule-form">
           <!-- Mode Selection Paper Tabs -->
           <div class="paper-tabs-row" id="schedule-mode-tabs" style="margin-bottom: 20px;">
-            <button class="paper-tab active" id="mode-class-btn" data-mode="class">Class Week</button>
-            <button class="paper-tab" id="mode-webinar-btn" data-mode="webinar">Webinar / Lecture</button>
+            <button class="paper-tab" id="mode-class-btn" data-mode="class">Class Week</button>
+            <button class="paper-tab active" id="mode-webinar-btn" data-mode="webinar">Webinar / Lecture</button>
           </div>
 
           <label class="field"><span>Subject / Webinar Name</span><input type="text" id="sched-subject" placeholder="Physics"></label>
 
           <!-- Standard Class Fields -->
-          <div id="class-mode-fields">
+          <div id="class-mode-fields" class="hidden">
             <label class="field"><span>Week Start</span><input type="date" id="sched-week-start"></label>
-            <div id="schedule-days"></div>
+            <div style="margin-top: 12px; margin-bottom: 12px;">
+              <button id="toggle-weekly-days-btn" class="btn-ghost" style="width: 100%; font-size: 12px; font-family: var(--font-body);">Edit Weekly Days (5 Days) ▼</button>
+            </div>
+            <div id="schedule-days" class="hidden"></div>
             <button id="save-schedule-btn" class="btn-primary" style="margin-top:12px">Save Schedule</button>
           </div>
 
           <!-- Webinar Controls -->
-          <div id="webinar-mode-fields" class="hidden" style="margin-top: 16px;">
+          <div id="webinar-mode-fields" style="margin-top: 16px;">
             <button id="toggle-webinar-btn" class="btn-primary" style="background:var(--pin-approved); color:var(--paper); border-color:var(--pin-approved);">Start Webinar Session</button>
             <p class="typewriter-subhead" id="webinar-status-text" style="font-size:12px; margin-top:8px; text-align:center; color:var(--paper-ink);">Session is currently closed.</p>
           </div>
@@ -365,19 +371,16 @@
   </div>
 
   <!-- Live Doubts Panel -->
-  <div class="teacher-panel" id="panel-live">
+  <div class="teacher-panel" id="panel-live" role="tabpanel" aria-labelledby="tab-live" aria-hidden="true">
     <h2 class="panel-title">Flagged for Review</h2>
     <div id="moderation-list" class="corkboard-row" style="margin-bottom: 32px;"><p class="empty-state">No doubts pinned yet — be the first.</p></div>
 
     <h2 class="panel-title">Approved Doubts Feed</h2>
     <div id="live-approved-list" class="corkboard-row"><p class="empty-state">No doubts pinned yet — be the first.</p></div>
-
-    <!-- Pinned/scattered notes visual placeholder inside panel-live to fill void -->
-    <div class="scattered-board-decor" id="scattered-decor-board"></div>
   </div>
 
   <!-- Clusters Panel -->
-  <div class="teacher-panel" id="panel-clusters">
+  <div class="teacher-panel" id="panel-clusters" role="tabpanel" aria-labelledby="tab-clusters" aria-hidden="true">
     <h2 class="panel-title">Cluster Review</h2>
     <div class="cluster-actions">
       <button id="auto-cluster-btn" class="btn-primary">Auto-Cluster</button>
@@ -388,13 +391,13 @@
   </div>
 
   <!-- Resolution Panel -->
-  <div class="teacher-panel" id="panel-resolution">
+  <div class="teacher-panel" id="panel-resolution" role="tabpanel" aria-labelledby="tab-resolution" aria-hidden="true">
     <h2 class="panel-title">Day 5 Resolution Queue</h2>
     <div id="resolution-list" class="corkboard-row"><p class="empty-state">Waiting for resolution day or cluster finalization.</p></div>
   </div>
 
   <!-- Leaderboard Panel -->
-  <div class="teacher-panel" id="panel-leaderboard">
+  <div class="teacher-panel" id="panel-leaderboard" role="tabpanel" aria-labelledby="tab-leaderboard" aria-hidden="true">
     <h2 class="panel-title">Leaderboard</h2>
     <div class="leaderboard-actions">
       <button id="refresh-leaderboard-btn" class="btn-ghost">Refresh</button>
@@ -416,7 +419,7 @@
 </main>
 
 <!-- Themed Dialog Modal overlay -->
-<div id="themed-modal" class="themed-modal hidden" role="dialog" aria-modal="true">
+<div id="themed-modal" class="themed-modal hidden" role="dialog" aria-modal="true" aria-labelledby="themed-modal-title" aria-describedby="themed-modal-body">
   <div class="themed-modal-content">
     <h3 id="themed-modal-title" class="themed-modal-title">Confirm Action</h3>
     <div id="themed-modal-body" class="themed-modal-body"></div>

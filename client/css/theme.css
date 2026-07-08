@@ -13,6 +13,7 @@
   --pin-flagged: #b8443c;    /* red pin */
   --pin-approved: #4a7c62;   /* sage pin */
   --pin-pending: #c99a4a;    /* amber pin */
+  --dn-amber: #d97706;       /* resolution day label */
 
   /* Fonts */
   --font-display: 'Permanent Marker', cursive, sans-serif;
@@ -813,11 +814,15 @@ button {
 /* Empty states */
 .empty-state {
   font-family: var(--font-content);
-  font-size: 13px;
-  color: var(--chalk-muted);
-  opacity: 0.8;
-  padding: 24px 0;
+  font-size: 14px;
+  color: var(--chalk);
+  padding: 32px 16px;
+  text-align: center;
+  border: 1px dashed rgba(243, 237, 224, 0.2);
+  background-color: rgba(255, 255, 255, 0.02);
+  border-radius: 4px;
   width: 100%;
+  box-sizing: border-box;
 }
 
 /* Scattered resolved visual notes decoration on Teacher Live page */
@@ -1513,13 +1518,18 @@ button {
   text-align: center;
 }
 
+@media (min-width: 769px) {
+  .tab-text-short {
+    display: none;
+  }
+}
 @media (max-width: 768px) {
-  .teacher-tab .tab-text {
+  .tab-text-long {
     display: none;
   }
   .teacher-tab .tab-num {
-    font-weight: bold;
-    font-size: 15px;
+    margin-right: 4px;
+    font-size: 12px;
   }
 }
 

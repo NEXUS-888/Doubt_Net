@@ -51,6 +51,11 @@ const Teacher = (() => {
     }
     UI.showScreen('teacher-screen');
 
+    // Request Notification permission when entering room dashboard
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+
     bindEventsOnce();
     requestSchedule();
     requestDoubts();
@@ -72,10 +77,17 @@ const Teacher = (() => {
         });
         tab.classList.add('active');
         tab.setAttribute('aria-selected', 'true');
-        Object.keys(panels).forEach(key => panels[key].classList.remove('active'));
+
+        Object.keys(panels).forEach(key => {
+          panels[key].classList.remove('active');
+          panels[key].setAttribute('aria-hidden', 'true');
+        });
         const panel = panels[tab.dataset.tab];
-        if (panel) panel.classList.add('active');
-        
+        if (panel) {
+          panel.classList.add('active');
+          panel.setAttribute('aria-hidden', 'false');
+        }
+
         if (tab.dataset.tab === 'clusters') {
           UI.showSkeleton('cluster-list', 3);
           requestClusters();
@@ -95,6 +107,16 @@ const Teacher = (() => {
         }
       });
     });
+
+    const toggleWeeklyBtn = document.getElementById('toggle-weekly-days-btn');
+    const scheduleDaysEl = document.getElementById('schedule-days');
+    if (toggleWeeklyBtn && scheduleDaysEl) {
+      toggleWeeklyBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        const isHidden = scheduleDaysEl.classList.toggle('hidden');
+        toggleWeeklyBtn.textContent = isHidden ? 'Edit Weekly Days (5 Days) ▼' : 'Close Weekly Days (5 Days) ▲';
+      });
+    }
 
     const allowAllDoubtsBtn = document.getElementById('allow-all-doubts-btn');
     let allowAllDoubtsEnabled = false;
@@ -128,7 +150,7 @@ const Teacher = (() => {
       toggleWebinarBtn.addEventListener('click', () => {
         const nextActive = !currentWebinarActive;
         const subject = schedSubject.value.trim() || 'Webinar Session';
-        
+
         DoubtNetAPI.send({
           type: 'set_schedule',
           schedule: {
@@ -137,14 +159,14 @@ const Teacher = (() => {
             subject: subject
           }
         });
-        
+
         UI.toast(nextActive ? 'Webinar session started!' : 'Webinar session stopped.', 'success');
       });
     }
 
     saveScheduleBtn.addEventListener('click', saveSchedule);
     demoModeBtn.addEventListener('click', toggleDemo);
-    
+
     allowAllDoubtsBtn.addEventListener('click', () => {
       allowAllDoubtsEnabled = !allowAllDoubtsEnabled;
       DoubtNetAPI.send({ type: 'toggle_allow_all_doubts', enabled: allowAllDoubtsEnabled });
@@ -699,13 +721,13 @@ const Teacher = (() => {
     entries.slice(0, 5).forEach((e, i) => {
       const card = UI.el('div', `lb-note rank-${e.rank}`);
       card.style.transform = `rotate(${(-2.5 + Math.random() * 5).toFixed(1)}deg)`;
-      
+
       const pin = UI.el('div', 'pushpin');
       const rank = UI.el('div', 'lb-note-rank', `#${e.rank}`);
       const name = e.real_name && e.show_real_name ? `${e.handle} (${e.real_name})` : e.handle;
       const handle = UI.el('div', 'lb-note-handle', name);
       const pts = UI.el('div', 'lb-note-points', `${e.total_points} pts`);
-      
+
       card.appendChild(pin);
       card.appendChild(rank);
       card.appendChild(handle);
@@ -728,7 +750,7 @@ const Teacher = (() => {
       gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.35);
       osc.start(audioCtx.currentTime);
       osc.stop(audioCtx.currentTime + 0.35);
-      
+
       setTimeout(() => {
         const osc2 = audioCtx.createOscillator();
         const gain2 = audioCtx.createGain();
@@ -760,7 +782,7 @@ const Teacher = (() => {
     }
 
     const roomText = roomDisplay ? roomDisplay.textContent : 'Classroom';
-    
+
     // Escape helper for the export document (prevents XSS in exported HTML)
     function esc(str) {
       if (str == null) return '';
@@ -798,62 +820,231 @@ const Teacher = (() => {
       <html>
       <head>
         <title>DoubtNet Session Report</title>
+        <link rel="preconnect" href="https://fonts.googleapis.com">
+        <link href="https://fonts.googleapis.com/css2?family=Permanent+Marker&family=Special+Elite&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
         <style>
-          body { font-family: 'Inter', sans-serif; padding: 30px; color: #111; line-height: 1.5; }
-          h1 { margin-bottom: 4px; font-size: 24px; }
-          .meta { font-size: 13px; color: #555; margin-bottom: 30px; border-bottom: 2px solid #333; padding-bottom: 10px; }
-          .section { margin-bottom: 30px; }
-          h2 { font-size: 18px; border-bottom: 1px solid #ddd; padding-bottom: 6px; margin-bottom: 15px; }
-          table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-          th, td { border: 1px solid #ddd; padding: 8px 12px; text-align: left; font-size: 13px; }
-          th { background-color: #f5f5f5; }
+          html, body {
+            background-color: #17261f;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            min-height: 100vh;
+            font-family: 'IBM Plex Sans', sans-serif;
+          }
+          
+          .paper-sheet {
+            background-color: #ead9b0;
+            color: #3a2f1f;
+            max-width: 800px;
+            width: 90%;
+            margin: 40px auto;
+            padding: 40px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+            border-radius: 4px;
+            position: relative;
+            box-sizing: border-box;
+            border: 1px solid rgba(58, 47, 31, 0.15);
+          }
+          
+          .pushpin {
+            width: 15px;
+            height: 15px;
+            background-color: #b8443c;
+            border-radius: 50%;
+            position: absolute;
+            top: 15px;
+            left: 50%;
+            transform: translateX(-50%);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+          }
+          .pushpin::after {
+            content: '';
+            position: absolute;
+            top: 5px;
+            left: 5px;
+            width: 5px;
+            height: 5px;
+            background-color: rgba(255, 255, 255, 0.5);
+            border-radius: 50%;
+          }
+
+          h1 {
+            font-family: 'Permanent Marker', cursive, sans-serif;
+            margin-top: 10px;
+            margin-bottom: 6px;
+            font-size: 28px;
+            color: #3a2f1f;
+            border-bottom: 2px dashed rgba(58, 47, 31, 0.2);
+            padding-bottom: 8px;
+          }
+          
+          .meta {
+            font-family: 'Special Elite', monospace, serif;
+            font-size: 13px;
+            opacity: 0.85;
+            margin-bottom: 30px;
+          }
+          
+          .section {
+            margin-bottom: 32px;
+          }
+          
+          h2 {
+            font-family: 'Special Elite', monospace, serif;
+            font-size: 18px;
+            border-bottom: 1px dashed rgba(58, 47, 31, 0.2);
+            padding-bottom: 6px;
+            margin-bottom: 16px;
+          }
+          
+          table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+            font-family: 'IBM Plex Sans', sans-serif;
+          }
+          th, td {
+            border: 1px dashed rgba(58, 47, 31, 0.25);
+            padding: 10px 14px;
+            text-align: left;
+            font-size: 14px;
+          }
+          th {
+            background-color: rgba(58, 47, 31, 0.05);
+            font-weight: 600;
+          }
+          
+          .cluster-card {
+            border: 1px dashed rgba(58, 47, 31, 0.25);
+            padding: 14px;
+            margin-bottom: 14px;
+            border-radius: 4px;
+            background-color: rgba(255, 255, 255, 0.1);
+          }
+          .cluster-card h4 {
+            margin: 0 0 6px;
+            font-family: 'Special Elite', monospace;
+            font-size: 15px;
+          }
+          .cluster-card p {
+            margin: 0 0 8px;
+            font-size: 15px;
+            font-style: italic;
+          }
+          .cluster-card span {
+            font-size: 12px;
+            opacity: 0.7;
+          }
+          
+          .print-btn-container {
+            display: flex;
+            justify-content: flex-end;
+            margin-bottom: 16px;
+          }
+          
+          .print-btn {
+            padding: 10px 20px;
+            background-color: #3a2f1f;
+            color: #ead9b0;
+            border: 1px solid #3a2f1f;
+            border-radius: 4px;
+            font-family: 'IBM Plex Sans', sans-serif;
+            font-weight: bold;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.15);
+          }
+          .print-btn:hover {
+            background-color: #ead9b0;
+            color: #3a2f1f;
+          }
+
           @media print {
-            body { padding: 0; }
-            button { display: none; }
+            html, body {
+              background-color: white;
+              color: black;
+              display: block;
+              min-height: auto;
+            }
+            .paper-sheet {
+              background-color: white;
+              color: black;
+              box-shadow: none;
+              border: none;
+              padding: 0;
+              margin: 0;
+              width: 100%;
+              max-width: 100%;
+            }
+            .pushpin {
+              display: none;
+            }
+            .print-btn-container {
+              display: none;
+            }
+            h1, h2 {
+              color: black;
+              border-bottom-color: black;
+            }
+            th, td, .cluster-card {
+              border-color: black;
+            }
+            .cluster-card {
+              background-color: transparent;
+            }
           }
         </style>
       </head>
       <body>
-        <div style="display:flex; justify-content:space-between; align-items:center;">
+        <div class="paper-sheet">
+          <div class="pushpin"></div>
+          <div class="print-btn-container">
+            <button id="print-btn" class="print-btn">Print / Save as PDF</button>
+          </div>
           <h1>DoubtNet Classroom Session Report</h1>
-          <button onclick="window.print()" style="padding: 8px 16px; background-color: #7c3aed; color: white; border: none; border-radius: 4px; cursor: pointer;">Print / Save as PDF</button>
-        </div>
-        <div class="meta">
-          <strong>Room Scope:</strong> ${roomText} | <strong>Date Generated:</strong> ${new Date().toLocaleString()}
-        </div>
-        
-        <div class="section">
-          <h2>🏆 Student Leaderboard</h2>
-          <table>
-            <thead>
-              <tr><th>Rank</th><th>Student handle</th><th>Points</th></tr>
-            </thead>
-            <tbody>
-              ${lbRows}
-            </tbody>
-          </table>
-        </div>
+          <div class="meta">
+            <strong>Room Scope:</strong> ${esc(roomText)} | <strong>Date Generated:</strong> ${esc(new Date().toLocaleString())}
+          </div>
+          
+          <div class="section">
+            <h2>🏆 Student Leaderboard</h2>
+            <table>
+              <thead>
+                <tr><th>Rank</th><th>Student handle</th><th>Points</th></tr>
+              </thead>
+              <tbody>
+                ${lbRows}
+              </tbody>
+            </table>
+          </div>
 
-        <div class="section">
-          <h2>🧠 Categorized Doubt Clusters (Machine Learning Groups)</h2>
-          ${clusterCards}
-        </div>
+          <div class="section">
+            <h2>🧠 Categorized Doubt Clusters (Machine Learning Groups)</h2>
+            ${clusterCards.replace(/style="border: 1px solid #ddd; padding: 12px; margin-bottom: 12px; border-radius: 6px;"/g, 'class="cluster-card"')}
+          </div>
 
-        <div class="section">
-          <h2>📝 Individual Approved Doubts</h2>
-          <ul style="padding-left: 20px; font-size: 13px;">
-            ${approvedDoubtsRows}
-          </ul>
+          <div class="section">
+            <h2>📝 Individual Approved Doubts</h2>
+            <ul style="padding-left: 20px; font-size: 14px; font-family: 'IBM Plex Sans', sans-serif;">
+              ${approvedDoubtsRows}
+            </ul>
+          </div>
         </div>
       </body>
       </html>
     `);
     reportWindow.document.close();
-  }
 
-  // Request Notification permission when mounting
-  if ('Notification' in window && Notification.permission === 'default') {
-    Notification.requestPermission();
+    // Bind event programmatically to bypass inline onclick CSP restrictions
+    const printBtn = reportWindow.document.getElementById('print-btn');
+    if (printBtn) {
+      printBtn.addEventListener('click', () => {
+        reportWindow.print();
+      });
+    }
   }
 
   return { start };

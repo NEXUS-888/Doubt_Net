@@ -16,10 +16,10 @@ const Auth = (() => {
   const roleStudent = document.getElementById('role-student');
   const roleTeacher = document.getElementById('role-teacher');
   const authForm = document.getElementById('auth-form');
-  
+
   const usernameInput = document.getElementById('username-input');
   const passwordInput = document.getElementById('password-input');
-  
+
   const authError = document.getElementById('auth-error');
   const submitLabel = document.getElementById('auth-submit-label');
   const serverUrlInput = document.getElementById('server-url-input');
@@ -27,7 +27,10 @@ const Auth = (() => {
 
   function init() {
     if (serverUrlInput) {
-      const ip = window.SERVER_IP || '10.136.99.209';
+      let ip = window.location.hostname;
+      if (!ip || ip === '') {
+        ip = window.SERVER_IP || 'localhost';
+      }
       const wsProtocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
       serverUrlInput.value = `${wsProtocol}://${ip}:8765`;
     }
@@ -43,7 +46,7 @@ const Auth = (() => {
         UI.Modal.showConfirm(
           'About Doubtnet',
           'Doubtnet is a real-time anonymous doubt resolution board. Students can submit doubts and constructive feedback anonymously without fear of judgment. Teachers can group similar questions dynamically using AI-driven clustering, explain them in resolution sessions, and reward active participation with points.',
-          () => {},
+          () => { },
           null // alert mode
         );
       });
@@ -141,6 +144,9 @@ const Auth = (() => {
     roleRow.classList.toggle('hidden', !register);
     submitLabel.textContent = register ? 'Create Account' : 'Sign in';
     authError.textContent = '';
+    setTimeout(() => {
+      if (usernameInput) usernameInput.focus();
+    }, 50);
   }
 
   function setRole(role) {
@@ -150,6 +156,9 @@ const Auth = (() => {
     roleStudent.setAttribute('aria-selected', role === 'student' ? 'true' : 'false');
     roleTeacher.setAttribute('aria-selected', role === 'teacher' ? 'true' : 'false');
     authError.textContent = '';
+    setTimeout(() => {
+      if (usernameInput) usernameInput.focus();
+    }, 50);
   }
 
   function handleSubmit() {
@@ -202,12 +211,29 @@ const Auth = (() => {
     // Hook listeners
     setupAuthListeners();
 
-    DoubtNetAPI.on('open', function sendAuth() {
+    function sendAuth() {
       DoubtNetAPI.off('open', sendAuth);
+      DoubtNetAPI.off('close', onConnError);
+      brandDot.classList.add('online');
+      authError.textContent = 'Connected. Authenticating...';
       DoubtNetAPI.send(msg);
-    });
+    }
 
-    DoubtNetAPI.connect(serverUrl);
+    function onConnError() {
+      DoubtNetAPI.off('open', sendAuth);
+      DoubtNetAPI.off('close', onConnError);
+      brandDot.classList.remove('online');
+      authError.textContent = 'Could not connect to WebSocket server. Make sure it is running and the URL is correct.';
+      UI.shake('auth-card');
+    }
+
+    if (DoubtNetAPI.isOpen() && DoubtNetAPI.getUrl() === serverUrl) {
+      sendAuth();
+    } else {
+      DoubtNetAPI.on('open', sendAuth);
+      DoubtNetAPI.on('close', onConnError);
+      DoubtNetAPI.connect(serverUrl);
+    }
   }
 
   function setupAuthListeners() {
@@ -228,7 +254,7 @@ const Auth = (() => {
       authError.textContent = data.message || 'Authentication failed.';
       const pickerError = document.getElementById('picker-error');
       if (pickerError) pickerError.textContent = data.message || 'Action failed.';
-      
+
       if (!document.getElementById('room-picker-screen').classList.contains('hidden')) {
         UI.shake('room-picker-screen');
       } else {

@@ -22,3 +22,6 @@ Thumbs.db
 *.njsproj
 *.sln
 *.swp
+
+# Test audit outputs
+output/

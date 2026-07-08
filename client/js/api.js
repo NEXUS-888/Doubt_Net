@@ -124,5 +124,9 @@ const DoubtNetAPI = (() => {
     return inRoom;
   }
 
-  return { connect, disconnect, send, isOpen, on, off, setInRoom, isInRoom };
+  function getUrl() {
+    return url;
+  }
+
+  return { connect, disconnect, send, isOpen, on, off, setInRoom, isInRoom, getUrl };
 })();

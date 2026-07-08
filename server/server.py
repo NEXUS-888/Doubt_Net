@@ -62,12 +62,25 @@ class _NoListingHandler(http.server.SimpleHTTPRequestHandler):
         pass
 
 
+def get_local_ip():
+    import socket
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        # Query public DNS to determine active interface local IP
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+        s.close()
+        return ip
+    except Exception:
+        return "127.0.0.1"
+
+
 def start_http_server(bind_ip):
     """Serve the client directory over HTTP for easy access."""
     client_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "client")
     client_dir = os.path.normpath(client_dir)
     
-    display_ip = bind_ip if bind_ip != '0.0.0.0' else '10.136.99.209'
+    display_ip = bind_ip if bind_ip != '0.0.0.0' else get_local_ip()
     config_path = os.path.join(client_dir, "js", "config.js")
     with open(config_path, "w") as f:
         f.write(f'window.SERVER_IP = "{display_ip}";\n')
@@ -84,7 +97,8 @@ async def main():
     async def handler(websocket):
         await handle_connection(websocket, manager)
 
-    print(f"[+] DoubtNet server starting on ws://{HOST if HOST != '0.0.0.0' else '10.136.99.209'}:{PORT}")
+    display_ip = HOST if HOST != '0.0.0.0' else get_local_ip()
+    print(f"[+] DoubtNet server starting on ws://{display_ip}:{PORT}")
     print(f"[*] State broadcasts every {STATE_BROADCAST_INTERVAL}s")
 
     asyncio.create_task(state_broadcaster(manager))

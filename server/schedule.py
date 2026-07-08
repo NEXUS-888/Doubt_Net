@@ -26,7 +26,11 @@ def _ensure_store(room_code: str):
     path = os.path.join(d_dir, "schedule.json")
     if not os.path.exists(path):
         with open(path, "w") as f:
-            json.dump({}, f)
+            json.dump({
+                "mode": "webinar",
+                "webinar_active": False,
+                "subject": "Webinar Session"
+            }, f)
 
 
 def _load(room_code: str) -> dict:
@@ -34,7 +38,16 @@ def _load(room_code: str) -> dict:
     import rooms
     path = os.path.join(rooms.room_data_dir(room_code), "schedule.json")
     with open(path, "r") as f:
-        return json.load(f)
+        data = json.load(f)
+        if not data:
+            data = {
+                "mode": "webinar",
+                "webinar_active": False,
+                "subject": "Webinar Session"
+            }
+            # Save it so it's persisted
+            _save(data, room_code)
+        return data
 
 
 def _save(data: dict, room_code: str):

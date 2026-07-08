@@ -9,6 +9,7 @@ const Student = (() => {
   let myUsername = '';
   let countdownInterval = null;
   let autosaveTimer = null;
+  let lastAutosaveText = '';
 
   const meLabel = document.getElementById('student-me-label');
   const logoutBtn = document.getElementById('student-logout-btn');
@@ -47,7 +48,6 @@ const Student = (() => {
 
     bindEventsOnce();
     startCountdown(state);
-    setupAutosave();
   }
 
   function bindEventsOnce() {
@@ -62,6 +62,25 @@ const Student = (() => {
       const len = doubtInput.value.length;
       charCounter.textContent = `${len}/500`;
       submitBtn.disabled = len < 10;
+
+      // Autosave draft logic
+      autosaveIndicator.textContent = 'Typing...';
+      autosaveIndicator.classList.remove('saving');
+      if (autosaveTimer) clearTimeout(autosaveTimer);
+      autosaveTimer = setTimeout(() => {
+        const text = doubtInput.value;
+        if (text && text !== lastAutosaveText) {
+          autosaveIndicator.textContent = 'Saving...';
+          autosaveIndicator.classList.add('saving');
+          const sent = DoubtNetAPI.send({ type: 'autosave_draft', text });
+          if (sent) {
+            lastAutosaveText = text;
+          } else {
+            autosaveIndicator.textContent = 'Offline — not saved';
+            autosaveIndicator.classList.remove('saving');
+          }
+        }
+      }, 2000);
     });
 
     urgencyOptions.forEach(opt => {
@@ -249,24 +268,7 @@ const Student = (() => {
     }
   }
 
-  function setupAutosave() {
-    let lastText = '';
-    let timeout = null;
-    doubtInput.addEventListener('input', () => {
-      autosaveIndicator.textContent = 'Typing...';
-      autosaveIndicator.classList.remove('saving');
-      if (timeout) clearTimeout(timeout);
-      timeout = setTimeout(() => {
-        const text = doubtInput.value;
-        if (text && text !== lastText) {
-          lastText = text;
-          autosaveIndicator.textContent = 'Saving...';
-          autosaveIndicator.classList.add('saving');
-          DoubtNetAPI.send({ type: 'autosave_draft', text });
-        }
-      }, 2000); // Save 2 seconds after user stops typing
-    });
-  }
+
 
   function submitDoubt() {
     const text = doubtInput.value.trim();
@@ -335,13 +337,13 @@ const Student = (() => {
 
       const urgencyText = d.urgency === 'feedback' ? 'Feedback' : (d.urgency === 'blocking' ? 'Blocking' : 'Clarification');
       const metaLeft = UI.el('span', 'note-author', `Day ${d.day} — ${urgencyText}`);
-      
+
       let statusDisplay = d.status;
       if (d.status === 'pending') statusDisplay = 'awaiting review';
       else if (d.status === 'approved') statusDisplay = 'approved';
       else if (d.status === 'resolved') statusDisplay = 'resolved';
       else if (d.status === 'flagged') statusDisplay = 'flagged';
-      
+
       const metaRight = UI.el('span', '', statusDisplay);
 
       meta.appendChild(metaLeft);
@@ -360,13 +362,13 @@ const Student = (() => {
     entries.slice(0, 5).forEach((e, i) => {
       const card = UI.el('div', `lb-note rank-${e.rank}`);
       card.style.transform = `rotate(${(-2.5 + Math.random() * 5).toFixed(1)}deg)`;
-      
+
       const pin = UI.el('div', 'pushpin');
       const rank = UI.el('div', 'lb-note-rank', `#${e.rank}`);
       const name = e.real_name && e.show_real_name ? `${e.handle} (${e.real_name})` : e.handle;
       const handle = UI.el('div', 'lb-note-handle', name);
       const pts = UI.el('div', 'lb-note-points', `${e.total_points} pts`);
-      
+
       card.appendChild(pin);
       card.appendChild(rank);
       card.appendChild(handle);
