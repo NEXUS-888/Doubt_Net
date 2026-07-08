@@ -40,20 +40,21 @@
     <section class="landing-cards-container">
       <div class="pinned-note pending" style="transform: rotate(-2.5deg);">
         <div class="pushpin"></div>
-        <div class="note-content">You submit doubts or constructive session feedback anonymously, without fear of judgment.</div>
+        <div class="note-content">Submit doubts anonymously without fear of judgment.</div>
       </div>
       <div class="pinned-note approved" style="transform: rotate(1.8deg);">
         <div class="pushpin"></div>
-        <div class="note-content">Speakers start instant live Webinars or configure structured Class Weeks to fit any lecture style.</div>
+        <div class="note-content">Host instant live webinars or structured class sessions.</div>
       </div>
       <div class="pinned-note flagged" style="transform: rotate(-1.5deg);">
         <div class="pushpin"></div>
-        <div class="note-content">Group similar questions dynamically via AI clustering, resolve doubts, and score leaderboard points.</div>
+        <div class="note-content">AI-cluster similar doubts, resolve them, and win points.</div>
       </div>
     </section>
 
-    <div class="landing-cta-container">
-      <button class="landing-cta-btn" id="landing-start-btn">Pin a Doubt</button>
+    <div class="landing-cta-container" style="display: flex; gap: 16px; justify-content: center; flex-wrap: wrap;">
+      <button class="landing-cta-btn" id="landing-join-btn" style="background: var(--pin-approved); color: var(--chalk);">Join a Class</button>
+      <button class="landing-cta-btn" id="landing-host-btn" style="background: var(--pin-pending); color: var(--paper-ink);">Host a Session</button>
     </div>
   </div>
 
@@ -76,8 +77,8 @@
       <button class="paper-tab" id="tab-register" role="tab" aria-selected="false">Register</button>
     </div>
     <div class="paper-tabs-row role-row hidden" role="tablist" id="role-row">
-      <button class="paper-tab active" id="role-student" role="tab" data-role="student">Student</button>
-      <button class="paper-tab" id="role-teacher" role="tab" data-role="teacher">Teacher</button>
+      <button class="paper-tab active" id="role-student" role="tab" aria-selected="true" data-role="student">Student</button>
+      <button class="paper-tab" id="role-teacher" role="tab" aria-selected="false" data-role="teacher">Teacher</button>
     </div>
 
     <form id="auth-form" autocomplete="off" onsubmit="return false">
@@ -104,8 +105,9 @@
       <span>// server url:</span>
       <input type="text" id="server-url-input" value="" placeholder="ws://localhost:8765" autocomplete="off">
     </div>
-    <div style="text-align: center; margin-top: 12px;">
+    <div style="text-align: center; margin-top: 12px; display: flex; flex-direction: column; gap: 8px;">
       <a href="#" id="toggle-advanced-settings" style="font-size: 11px; text-decoration: underline; color: var(--paper-ink); opacity: 0.6; font-family: var(--font-body);">Advanced Settings</a>
+      <a href="#" id="auth-back-to-landing" style="font-size: 11px; text-decoration: underline; color: var(--paper-ink); opacity: 0.6; font-family: var(--font-body);">Back to Home</a>
     </div>
   </div>
 </main>
@@ -170,7 +172,6 @@
     </div>
     <div class="dash-header-center">
       <span class="phase-badge" id="student-phase-badge">Waiting</span>
-      <span class="countdown-timer" id="student-countdown"></span>
     </div>
     <div class="dash-header-right">
       <span class="points-badge" id="student-points-badge">0 pts</span>
@@ -189,8 +190,11 @@
     <section class="submission-panel" id="submission-panel">
       <h2 class="panel-title">Submit a Doubt</h2>
       <div class="phase-status-card" id="phase-status-card">
-        <div class="phase-icon" id="phase-icon">&#9203;</div>
-        <div class="phase-text" id="phase-text">Waiting for class...</div>
+        <div class="phase-icon" id="student-phase-icon">&#9203;</div>
+        <div class="phase-text-container" style="display: flex; flex-direction: column; gap: 4px;">
+          <div class="phase-text" id="student-phase-text">Waiting for class...</div>
+          <span class="phase-countdown" id="student-phase-countdown" aria-live="polite" style="font-family: var(--font-content); font-size: 13px; color: var(--pin-pending); font-weight: bold;"></span>
+        </div>
       </div>
 
       <div class="doubt-form" id="doubt-form-area">
@@ -262,12 +266,22 @@
     <button class="btn-unpin" id="teacher-unpin-btn">Unpin</button>
   </div>
 
-  <div class="teacher-tabs" id="teacher-tabs">
-    <button class="teacher-tab active" data-tab="schedule">Schedule</button>
-    <button class="teacher-tab" data-tab="live">Live Doubts</button>
-    <button class="teacher-tab" data-tab="clusters">Clusters</button>
-    <button class="teacher-tab" data-tab="resolution">Resolution</button>
-    <button class="teacher-tab" data-tab="leaderboard">Leaderboard</button>
+  <div class="teacher-tabs" id="teacher-tabs" role="tablist">
+    <button class="teacher-tab active" data-tab="schedule" role="tab" aria-selected="true" aria-controls="panel-schedule">
+      <span class="tab-num">1</span><span class="tab-text"> Schedule</span>
+    </button>
+    <button class="teacher-tab" data-tab="live" role="tab" aria-selected="false" aria-controls="panel-live">
+      <span class="tab-num">2</span><span class="tab-text"> Moderate</span>
+    </button>
+    <button class="teacher-tab" data-tab="clusters" role="tab" aria-selected="false" aria-controls="panel-clusters">
+      <span class="tab-num">3</span><span class="tab-text"> Cluster</span>
+    </button>
+    <button class="teacher-tab" data-tab="resolution" role="tab" aria-selected="false" aria-controls="panel-resolution">
+      <span class="tab-num">4</span><span class="tab-text"> Resolve</span>
+    </button>
+    <button class="teacher-tab" data-tab="leaderboard" role="tab" aria-selected="false" aria-controls="panel-leaderboard">
+      <span class="tab-num">5</span><span class="tab-text"> Leaderboard</span>
+    </button>
   </div>
 
   <!-- Schedule Panel -->

@@ -13,10 +13,9 @@ const Student = (() => {
   const meLabel = document.getElementById('student-me-label');
   const logoutBtn = document.getElementById('student-logout-btn');
   const phaseBadge = document.getElementById('student-phase-badge');
-  const countdownEl = document.getElementById('student-countdown');
-  const phaseCard = document.getElementById('phase-status-card');
-  const phaseIcon = document.getElementById('phase-icon');
-  const phaseText = document.getElementById('phase-text');
+  const phaseIcon = document.getElementById('student-phase-icon');
+  const phaseText = document.getElementById('student-phase-text');
+  const countdownEl = document.getElementById('student-phase-countdown');
   const doubtFormArea = document.getElementById('doubt-form-area');
   const doubtInput = document.getElementById('doubt-input');
   const charCounter = document.getElementById('char-counter');
@@ -56,8 +55,7 @@ const Student = (() => {
     bound = true;
 
     logoutBtn.addEventListener('click', () => {
-      DoubtNetAPI.disconnect();
-      window.location.reload();
+      App.signOut();
     });
 
     doubtInput.addEventListener('input', () => {
@@ -184,15 +182,13 @@ const Student = (() => {
         icon = '&#9888;&#65039;';
         if (state.mode === 'webinar') {
           text = `Doubt window open for ${subject}`;
-        } else if (state.allow_all_doubts || state.seconds_remaining === -1) {
-          text = 'Doubt window open';
         } else {
-          text = `Doubt window open, submit your query (${UI.formatCountdown(secsRemaining)} remaining)`;
+          text = 'Doubt window open — submit your query';
         }
         break;
       case 'grace_period':
         icon = '&#9201;&#65039;';
-        text = `Grace period — ${UI.formatCountdown(secsRemaining)} remaining to submit`;
+        text = 'Grace period — submit now';
         break;
       case 'resolution_session':
         icon = '&#128269;&#65039;';
@@ -232,20 +228,20 @@ const Student = (() => {
 
     if (phase === 'doubt_window' || phase === 'grace_period') {
       if (state.allow_all_doubts || secs === -1) {
-        countdownEl.textContent = 'Manual Open';
+        countdownEl.textContent = 'Limit: Manual Open';
         return;
       }
       let remaining = secs;
-      countdownEl.textContent = UI.formatCountdown(remaining);
+      countdownEl.textContent = 'Time Remaining: ' + UI.formatCountdown(remaining);
       const targetTime = Date.now() + remaining * 1000;
       countdownInterval = setInterval(() => {
         const diff = Math.max(0, Math.round((targetTime - Date.now()) / 1000));
         if (diff <= 0) {
-          countdownEl.textContent = '0:00';
+          countdownEl.textContent = 'Time Remaining: 0:00';
           clearInterval(countdownInterval);
           countdownInterval = null;
         } else {
-          countdownEl.textContent = UI.formatCountdown(diff);
+          countdownEl.textContent = 'Time Remaining: ' + UI.formatCountdown(diff);
         }
       }, 1000);
     } else {
@@ -386,5 +382,12 @@ const Student = (() => {
     studentLB.appendChild(footnote);
   }
 
-  return { start };
+  function stopCountdown() {
+    if (countdownInterval) {
+      clearInterval(countdownInterval);
+      countdownInterval = null;
+    }
+  }
+
+  return { start, stopCountdown };
 })();

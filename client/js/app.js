@@ -26,6 +26,18 @@ const App = (() => {
     _session = null;
   }
 
+  function signOut() {
+    DoubtNetAPI.disconnect();
+    DoubtNetAPI.setInRoom(false);
+    clearSession();
+    _username = null;
+    _role = null;
+    if (window.Student && typeof window.Student.stopCountdown === 'function') {
+      window.Student.stopCountdown();
+    }
+    UI.showScreen('landing-screen');
+  }
+
   function generateRandomCode() {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
     let code = '';
@@ -126,6 +138,9 @@ const App = (() => {
     DoubtNetAPI.off('rooms_list');
     DoubtNetAPI.off('auth_error');
 
+    _username = username;
+    _role = role;
+
     // Store room session details
     setRoomSession(roomCode, roomName);
 
@@ -144,11 +159,7 @@ const App = (() => {
     const logoutBtn = document.getElementById('picker-logout-btn');
     if (logoutBtn) {
       logoutBtn.addEventListener('click', () => {
-        DoubtNetAPI.disconnect();
-        clearSession();
-        _username = null;
-        _role = null;
-        UI.showScreen('landing-screen');
+        signOut();
       });
     }
 
@@ -259,6 +270,7 @@ const App = (() => {
         DoubtNetAPI.off('rooms_list');
         DoubtNetAPI.on('rooms_list', (data) => {
           DoubtNetAPI.off('rooms_list');
+          DoubtNetAPI.off('auth_error');
           // Auto select room
           DoubtNetAPI.off('room_entered');
           DoubtNetAPI.on('room_entered', (enteredData) => {
@@ -277,6 +289,18 @@ const App = (() => {
             }, 2000);
           });
           DoubtNetAPI.send({ type: 'select_room', room_code: _session.roomCode });
+        });
+
+        DoubtNetAPI.off('auth_error');
+        DoubtNetAPI.on('auth_error', (errData) => {
+          DoubtNetAPI.off('auth_error');
+          DoubtNetAPI.off('rooms_list');
+          DoubtNetAPI.off('room_entered');
+          DoubtNetAPI.setInRoom(false);
+          clearSession();
+          banner.textContent = "Re-authentication failed. Please sign in again.";
+          banner.className = "connection-status-banner disconnected";
+          banner.classList.remove('hidden');
         });
 
         DoubtNetAPI.send({ type: 'login', username: _session.username, password: _session.password });
@@ -322,7 +346,7 @@ const App = (() => {
     });
   }
 
-  return { init, onAuthenticated, showRoomPicker, setSession, setRoomSession, clearSession };
+  return { init, onAuthenticated, showRoomPicker, setSession, setRoomSession, clearSession, signOut };
 })();
 
 document.addEventListener('DOMContentLoaded', App.init);

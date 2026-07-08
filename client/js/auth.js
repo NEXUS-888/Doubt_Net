@@ -40,7 +40,12 @@ const Auth = (() => {
     const aboutBtn = document.getElementById('landing-about-btn');
     if (aboutBtn) {
       aboutBtn.addEventListener('click', () => {
-        UI.toast('DoubtNet is a real-time anonymous doubt resolution board.', 'info', 4000);
+        UI.Modal.showConfirm(
+          'About Doubtnet',
+          'Doubtnet is a real-time anonymous doubt resolution board. Students can submit doubts and constructive feedback anonymously without fear of judgment. Teachers can group similar questions dynamically using AI-driven clustering, explain them in resolution sessions, and reward active participation with points.',
+          () => {},
+          null // alert mode
+        );
       });
     }
 
@@ -60,11 +65,29 @@ const Auth = (() => {
       });
     }
 
-    const startBtn = document.getElementById('landing-start-btn');
-    if (startBtn) {
-      startBtn.addEventListener('click', () => {
-        setMode(false);
+    const joinBtn = document.getElementById('landing-join-btn');
+    if (joinBtn) {
+      joinBtn.addEventListener('click', () => {
+        setMode(false); // Join is student login
+        setRole('student');
         UI.showScreen('auth-screen');
+      });
+    }
+
+    const hostBtn = document.getElementById('landing-host-btn');
+    if (hostBtn) {
+      hostBtn.addEventListener('click', () => {
+        setMode(true); // Host is teacher register
+        setRole('teacher');
+        UI.showScreen('auth-screen');
+      });
+    }
+
+    const backToLanding = document.getElementById('auth-back-to-landing');
+    if (backToLanding) {
+      backToLanding.addEventListener('click', (e) => {
+        e.preventDefault();
+        UI.showScreen('landing-screen');
       });
     }
 
@@ -113,6 +136,8 @@ const Auth = (() => {
     isRegister = register;
     tabLogin.classList.toggle('active', !register);
     tabRegister.classList.toggle('active', register);
+    tabLogin.setAttribute('aria-selected', !register ? 'true' : 'false');
+    tabRegister.setAttribute('aria-selected', register ? 'true' : 'false');
     roleRow.classList.toggle('hidden', !register);
     submitLabel.textContent = register ? 'Create Account' : 'Sign in';
     authError.textContent = '';
@@ -122,6 +147,8 @@ const Auth = (() => {
     currentRole = role;
     roleStudent.classList.toggle('active', role === 'student');
     roleTeacher.classList.toggle('active', role === 'teacher');
+    roleStudent.setAttribute('aria-selected', role === 'student' ? 'true' : 'false');
+    roleTeacher.setAttribute('aria-selected', role === 'teacher' ? 'true' : 'false');
     authError.textContent = '';
   }
 
@@ -210,5 +237,5 @@ const Auth = (() => {
     });
   }
 
-  return { init, setupAuthListeners };
+  return { init, setupAuthListeners, setMode, setRole };
 })();

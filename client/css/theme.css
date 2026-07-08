@@ -1492,3 +1492,34 @@ button {
   margin-bottom: 6px;
 }
 
+/* Badge & Note styling */
+.teacher-badge {
+  font-family: var(--font-content);
+  font-size: 11px;
+  background: var(--pin-flagged);
+  color: var(--chalk);
+  padding: 2px 8px;
+  border-radius: 3px;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  display: inline-block;
+}
+.note-content {
+  font-family: var(--font-content);
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--paper-ink);
+  text-align: center;
+}
+
+@media (max-width: 768px) {
+  .teacher-tab .tab-text {
+    display: none;
+  }
+  .teacher-tab .tab-num {
+    font-weight: bold;
+    font-size: 15px;
+  }
+}
+

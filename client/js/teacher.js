@@ -61,15 +61,17 @@ const Teacher = (() => {
     bound = true;
 
     logoutBtn.addEventListener('click', () => {
-      DoubtNetAPI.disconnect();
-      App.clearSession();
-      window.location.reload();
+      App.signOut();
     });
 
     tabs.forEach(tab => {
       tab.addEventListener('click', () => {
-        tabs.forEach(t => t.classList.remove('active'));
+        tabs.forEach(t => {
+          t.classList.remove('active');
+          t.setAttribute('aria-selected', 'false');
+        });
         tab.classList.add('active');
+        tab.setAttribute('aria-selected', 'true');
         Object.keys(panels).forEach(key => panels[key].classList.remove('active'));
         const panel = panels[tab.dataset.tab];
         if (panel) panel.classList.add('active');
@@ -455,11 +457,6 @@ const Teacher = (() => {
           return;
         }
 
-        const timeout = setTimeout(() => {
-          setPending(false);
-          UI.toast('Request timed out. Please try again.', 'error');
-        }, 10000);
-
         const onDone = (resp) => {
           if (String(resp.doubt_id) === String(d.id)) {
             DoubtNetAPI.off('moderation_done', onDone);
@@ -468,6 +465,13 @@ const Teacher = (() => {
             UI.toast('Doubt approved', 'success');
           }
         };
+
+        const timeout = setTimeout(() => {
+          DoubtNetAPI.off('moderation_done', onDone);
+          setPending(false);
+          UI.toast('Request timed out. Please try again.', 'error');
+        }, 10000);
+
         DoubtNetAPI.on('moderation_done', onDone);
       });
 
@@ -480,11 +484,6 @@ const Teacher = (() => {
           return;
         }
 
-        const timeout = setTimeout(() => {
-          setPending(false);
-          UI.toast('Request timed out. Please try again.', 'error');
-        }, 10000);
-
         const onDone = (resp) => {
           if (String(resp.doubt_id) === String(d.id)) {
             DoubtNetAPI.off('moderation_done', onDone);
@@ -493,6 +492,13 @@ const Teacher = (() => {
             UI.toast('Doubt rejected', 'info');
           }
         };
+
+        const timeout = setTimeout(() => {
+          DoubtNetAPI.off('moderation_done', onDone);
+          setPending(false);
+          UI.toast('Request timed out. Please try again.', 'error');
+        }, 10000);
+
         DoubtNetAPI.on('moderation_done', onDone);
       });
       modList.appendChild(item);
@@ -551,14 +557,25 @@ const Teacher = (() => {
           <span class="note-author">Cluster ${UI.escapeHtml(cid)}</span>
           <span style="font-weight:bold; color:var(--pin-pending);">${c.size} doubts</span>
         </div>
-        <div style="margin-top: 8px; border-top: 1px dotted rgba(58,47,31,0.2); padding-top: 6px; font-size:10px; color:var(--chalk-muted); margin-bottom: 8px; word-break: break-all;">
+        <div id="cluster-details-${cid}" class="hidden" style="margin-top: 8px; border-top: 1px dotted rgba(58,47,31,0.2); padding-top: 6px; font-size:10px; color:var(--chalk-muted); margin-bottom: 8px; word-break: break-all;">
           IDs: ${c.doubt_ids.join(', ')}
         </div>
-        <div class="note-action-tabs" style="display:flex; gap: 8px;">
+        <div style="text-align: right; margin-bottom: 6px; width: 100%;">
+          <button class="btn-ghost toggle-details-btn" data-target="cluster-details-${cid}" style="font-size: 8px; padding: 2px 6px;">Show IDs</button>
+        </div>
+        <div class="note-action-tabs" style="display:flex; gap: 8px; width: 100%;">
           <button class="paper-tab merge-btn" style="font-size:10px; padding: 4px 8px; flex: 1;">Merge...</button>
           <button class="paper-tab split-btn" style="font-size:10px; padding: 4px 8px; flex: 1;">Split</button>
         </div>
       `;
+      card.querySelector('.toggle-details-btn').addEventListener('click', (e) => {
+        const targetId = e.target.dataset.target;
+        const detailsEl = card.querySelector(`#${targetId}`);
+        if (detailsEl) {
+          const isHidden = detailsEl.classList.toggle('hidden');
+          e.target.textContent = isHidden ? 'Show IDs' : 'Hide IDs';
+        }
+      });
       card.querySelector('.merge-btn').addEventListener('click', () => {
         let optionsHtml = '<select id="merge-target-select">';
         Object.keys(latestClusters).forEach(otherId => {

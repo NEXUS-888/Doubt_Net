@@ -100,7 +100,7 @@
   }
 }
 
-.moderation-item, .approved-item, .my-doubt-card, .leaderboard-row, .cluster-card {
+.pinned-note, .lb-note, .lb-entry {
   animation: item-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
@@ -141,21 +141,7 @@
   animation: countdown-pulse 1s ease-in-out infinite;
 }
 
-/* ---------- Glow Border Pulse (Focus State) ---------- */
-@keyframes glow-border {
-  0%, 100% {
-    border-color: var(--dn-violet);
-    box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.15), 0 0 10px rgba(124, 58, 237, 0.1);
-  }
-  50% {
-    border-color: var(--dn-pink);
-    box-shadow: 0 0 0 3px rgba(236, 72, 153, 0.25), 0 0 20px rgba(236, 72, 153, 0.3);
-  }
-}
 
-.field input:focus, .field textarea:focus {
-  animation: glow-border 2.5s ease-in-out infinite;
-}
 
 /* ---------- Interactive Error Shake ---------- */
 @keyframes shake {
@@ -175,7 +161,7 @@
 
 .btn-primary:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(124, 58, 237, 0.3);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
 }
 
 .btn-ghost:hover {
@@ -184,16 +170,7 @@
 }
 
 .tab:hover, .teacher-tab:hover {
-  color: var(--text-primary);
-}
-
-.my-doubt-card, .moderation-item, .approved-item, .cluster-card {
-  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.my-doubt-card:hover, .moderation-item:hover, .approved-item:hover, .cluster-card:hover {
-  transform: translateY(-2px) scale(1.005);
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  color: var(--chalk);
 }
 
 /* ---------- Confetti Cascade ---------- */

@@ -151,6 +151,7 @@ const UI = (() => {
   const Modal = (() => {
     let onConfirm = null;
     let onCancel = null;
+    let previousActiveElement = null;
 
     function getElements() {
       return {
@@ -160,6 +161,51 @@ const UI = (() => {
         cancelBtn: document.getElementById('themed-modal-cancel'),
         confirmBtn: document.getElementById('themed-modal-confirm')
       };
+    }
+
+    function closeModal() {
+      const { el } = getElements();
+      if (el) el.classList.add('hidden');
+      document.removeEventListener('keydown', handleKeydown);
+      if (previousActiveElement) {
+        previousActiveElement.focus();
+        previousActiveElement = null;
+      }
+    }
+
+    function handleKeydown(e) {
+      const { el } = getElements();
+      if (!el || el.classList.contains('hidden')) return;
+
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        closeModal();
+        if (onCancel) onCancel();
+        return;
+      }
+
+      if (e.key === 'Tab') {
+        const focusables = el.querySelectorAll('button, select, input, [tabindex="0"]');
+        const visibleFocusables = Array.from(focusables).filter(item => {
+          return !item.classList.contains('hidden') && item.style.display !== 'none';
+        });
+        if (visibleFocusables.length === 0) return;
+
+        const first = visibleFocusables[0];
+        const last = visibleFocusables[visibleFocusables.length - 1];
+
+        if (e.shiftKey) {
+          if (document.activeElement === first) {
+            last.focus();
+            e.preventDefault();
+          }
+        } else {
+          if (document.activeElement === last) {
+            first.focus();
+            e.preventDefault();
+          }
+        }
+      }
     }
 
     function initEvents() {
@@ -172,12 +218,12 @@ const UI = (() => {
         confirmBtn.parentNode.replaceChild(newConfirmBtn, confirmBtn);
 
         newCancelBtn.addEventListener('click', () => {
-          el.classList.add('hidden');
+          closeModal();
           if (onCancel) onCancel();
         });
 
         newConfirmBtn.addEventListener('click', () => {
-          el.classList.add('hidden');
+          closeModal();
           if (onConfirm) {
             const input = bodyEl.querySelector('input, select');
             const checkboxes = bodyEl.querySelectorAll('input[type="checkbox"]:checked');
@@ -191,27 +237,61 @@ const UI = (() => {
             }
           }
         });
+
+        // Add Escape/Tab listener
+        document.addEventListener('keydown', handleKeydown);
+
+        // Autofocus first interactive element
+        setTimeout(() => {
+          const focusables = el.querySelectorAll('button, select, input, [tabindex="0"]');
+          const visibleFocusables = Array.from(focusables).filter(item => {
+            return !item.classList.contains('hidden') && item.style.display !== 'none';
+          });
+          if (visibleFocusables.length > 0) {
+            visibleFocusables[0].focus();
+          }
+        }, 50);
       }
     }
 
     function showConfirm(title, message, confirmCb, cancelCb) {
-      const { el, titleEl, bodyEl } = getElements();
+      const { el, titleEl, bodyEl, cancelBtn, confirmBtn } = getElements();
       if (!el) return;
+      previousActiveElement = document.activeElement;
       titleEl.textContent = title;
       bodyEl.textContent = message;
       onConfirm = confirmCb;
       onCancel = cancelCb;
+
+      if (cancelCb === null) {
+        if (cancelBtn) cancelBtn.classList.add('hidden');
+        if (confirmBtn) confirmBtn.textContent = 'Close';
+      } else {
+        if (cancelBtn) cancelBtn.classList.remove('hidden');
+        if (confirmBtn) confirmBtn.textContent = 'Confirm';
+      }
+
       initEvents();
       el.classList.remove('hidden');
     }
 
     function showPrompt(title, message, inputHtml, confirmCb, cancelCb) {
-      const { el, titleEl, bodyEl } = getElements();
+      const { el, titleEl, bodyEl, cancelBtn, confirmBtn } = getElements();
       if (!el) return;
+      previousActiveElement = document.activeElement;
       titleEl.textContent = title;
       bodyEl.innerHTML = `<p>${message}</p>${inputHtml}`;
       onConfirm = confirmCb;
       onCancel = cancelCb;
+
+      if (cancelCb === null) {
+        if (cancelBtn) cancelBtn.classList.add('hidden');
+        if (confirmBtn) confirmBtn.textContent = 'Close';
+      } else {
+        if (cancelBtn) cancelBtn.classList.remove('hidden');
+        if (confirmBtn) confirmBtn.textContent = 'Confirm';
+      }
+
       initEvents();
       el.classList.remove('hidden');
     }
